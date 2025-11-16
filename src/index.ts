@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from 'dotenv';
+import { createGreetingsRouter } from './features/greetings/greetings.route';
 
 config();
 
@@ -17,6 +18,9 @@ app.use(express.json());
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Routes
+app.use('/api/greetings', createGreetingsRouter());
 
 // Start server
 app.listen(PORT, () => {
