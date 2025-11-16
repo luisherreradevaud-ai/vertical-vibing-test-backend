@@ -3,11 +3,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { config } from 'dotenv';
 import { createGreetingsRouter } from './features/greetings/greetings.route';
+import { createAuthRouter } from './features/auth/auth.route';
+import { createUsersRouter } from './features/users/users.route';
+import { createSubscriptionsRouter } from './features/subscriptions/subscriptions.route';
 
 config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(helmet());
@@ -20,6 +23,9 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', createAuthRouter());
+app.use('/api/users', createUsersRouter());
+app.use('/api/subscriptions', createSubscriptionsRouter());
 app.use('/api/greetings', createGreetingsRouter());
 
 // Start server
