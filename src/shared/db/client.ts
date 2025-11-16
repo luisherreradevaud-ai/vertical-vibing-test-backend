@@ -13,6 +13,8 @@
 import type { User, NewUser } from './schema/users.schema';
 import type { Subscription, NewSubscription } from './schema/subscriptions.schema';
 import type { Company, CompanyMember, CompanyRole } from '@vertical-vibing/shared-types';
+import type { IAMDatabase } from './repositories/iam.repository';
+import { iamDb } from './repositories/iam.repository';
 
 export interface Database {
   users: {
@@ -45,6 +47,7 @@ export interface Database {
     updateRole(companyId: string, userId: string, role: CompanyRole): Promise<CompanyMember | null>;
     delete(companyId: string, userId: string): Promise<boolean>;
   };
+  iam: IAMDatabase;
 }
 
 /**
@@ -322,6 +325,9 @@ class InMemoryDatabase implements Database {
       return true;
     },
   };
+
+  // IAM Database (imported from separate module for better organization)
+  iam: IAMDatabase = iamDb;
 }
 
 // Export singleton instance
