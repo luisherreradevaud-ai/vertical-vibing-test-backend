@@ -6,6 +6,7 @@ import { createGreetingsRouter } from './features/greetings/greetings.route';
 import { createAuthRouter } from './features/auth/auth.route';
 import { createUsersRouter } from './features/users/users.route';
 import { createSubscriptionsRouter } from './features/subscriptions/subscriptions.route';
+import { createCompaniesRouter } from './features/companies/companies.route';
 
 config();
 
@@ -26,6 +27,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', createAuthRouter());
 app.use('/api/users', createUsersRouter());
 app.use('/api/subscriptions', createSubscriptionsRouter());
+app.use('/api/companies', createCompaniesRouter());
 app.use('/api/greetings', createGreetingsRouter());
 
 // Start server

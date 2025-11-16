@@ -12,6 +12,7 @@
 
 import type { User, NewUser } from './schema/users.schema';
 import type { Subscription, NewSubscription } from './schema/subscriptions.schema';
+import type { Company, CompanyMember, CompanyRole } from '@vertical-vibing/shared-types';
 
 export interface Database {
   users: {
@@ -29,6 +30,21 @@ export interface Database {
     update(id: string, data: Partial<NewSubscription>): Promise<Subscription | null>;
     delete(id: string): Promise<boolean>;
   };
+  companies: {
+    findById(id: string): Promise<Company | null>;
+    findBySlug(slug: string): Promise<Company | null>;
+    findByUserId(userId: string): Promise<Company[]>;
+    create(company: Company): Promise<Company>;
+    update(id: string, data: Partial<Pick<Company, 'name' | 'slug'>>): Promise<Company | null>;
+    delete(id: string): Promise<boolean>;
+  };
+  companyMembers: {
+    findByCompanyId(companyId: string): Promise<CompanyMember[]>;
+    findByCompanyAndUser(companyId: string, userId: string): Promise<CompanyMember | null>;
+    create(member: CompanyMember): Promise<CompanyMember>;
+    updateRole(companyId: string, userId: string, role: CompanyRole): Promise<CompanyMember | null>;
+    delete(companyId: string, userId: string): Promise<boolean>;
+  };
 }
 
 /**
@@ -42,6 +58,10 @@ class InMemoryDatabase implements Database {
   private subscriptionsStore: Map<string, Subscription> = new Map();
   private userSubscriptionIndex: Map<string, string> = new Map(); // userId -> subscriptionId
   private stripeSubscriptionIndex: Map<string, string> = new Map(); // stripeSubscriptionId -> subscriptionId
+  private companiesStore: Map<string, Company> = new Map();
+  private companySlugIndex: Map<string, string> = new Map(); // slug -> companyId
+  private companyMembersStore: Map<string, CompanyMember> = new Map(); // `${companyId}:${userId}` -> member
+  private userCompaniesIndex: Map<string, Set<string>> = new Map(); // userId -> Set<companyId>
 
   users = {
     findByEmail: async (email: string): Promise<User | null> => {
@@ -182,6 +202,123 @@ class InMemoryDatabase implements Database {
         this.stripeSubscriptionIndex.delete(subscription.stripeSubscriptionId);
       }
       this.subscriptionsStore.delete(id);
+      return true;
+    },
+  };
+
+  companies = {
+    findById: async (id: string): Promise<Company | null> => {
+      return this.companiesStore.get(id) || null;
+    },
+
+    findBySlug: async (slug: string): Promise<Company | null> => {
+      const companyId = this.companySlugIndex.get(slug.toLowerCase());
+      if (!companyId) return null;
+      return this.companiesStore.get(companyId) || null;
+    },
+
+    findByUserId: async (userId: string): Promise<Company[]> => {
+      const companyIds = this.userCompaniesIndex.get(userId);
+      if (!companyIds) return [];
+      return Array.from(companyIds)
+        .map(id => this.companiesStore.get(id))
+        .filter((c): c is Company => c !== undefined);
+    },
+
+    create: async (company: Company): Promise<Company> => {
+      this.companiesStore.set(company.id, company);
+      this.companySlugIndex.set(company.slug.toLowerCase(), company.id);
+      return company;
+    },
+
+    update: async (id: string, data: Partial<Pick<Company, 'name' | 'slug'>>): Promise<Company | null> => {
+      const existing = this.companiesStore.get(id);
+      if (!existing) return null;
+
+      if (data.slug && data.slug !== existing.slug) {
+        this.companySlugIndex.delete(existing.slug.toLowerCase());
+        this.companySlugIndex.set(data.slug.toLowerCase(), id);
+      }
+
+      const updated: Company = {
+        ...existing,
+        ...data,
+        id,
+        updatedAt: new Date(),
+      };
+
+      this.companiesStore.set(id, updated);
+      return updated;
+    },
+
+    delete: async (id: string): Promise<boolean> => {
+      const company = this.companiesStore.get(id);
+      if (!company) return false;
+
+      this.companySlugIndex.delete(company.slug.toLowerCase());
+      this.companiesStore.delete(id);
+
+      // Clean up member associations
+      Array.from(this.companyMembersStore.keys())
+        .filter(key => key.startsWith(`${id}:`))
+        .forEach(key => this.companyMembersStore.delete(key));
+
+      return true;
+    },
+  };
+
+  companyMembers = {
+    findByCompanyId: async (companyId: string): Promise<CompanyMember[]> => {
+      return Array.from(this.companyMembersStore.entries())
+        .filter(([key]) => key.startsWith(`${companyId}:`))
+        .map(([, member]) => member);
+    },
+
+    findByCompanyAndUser: async (companyId: string, userId: string): Promise<CompanyMember | null> => {
+      const key = `${companyId}:${userId}`;
+      return this.companyMembersStore.get(key) || null;
+    },
+
+    create: async (member: CompanyMember): Promise<CompanyMember> => {
+      const key = `${member.companyId}:${member.userId}`;
+      this.companyMembersStore.set(key, member);
+
+      const userCompanies = this.userCompaniesIndex.get(member.userId) || new Set();
+      userCompanies.add(member.companyId);
+      this.userCompaniesIndex.set(member.userId, userCompanies);
+
+      return member;
+    },
+
+    updateRole: async (companyId: string, userId: string, role: CompanyRole): Promise<CompanyMember | null> => {
+      const key = `${companyId}:${userId}`;
+      const existing = this.companyMembersStore.get(key);
+      if (!existing) return null;
+
+      const updated: CompanyMember = {
+        ...existing,
+        role,
+      };
+
+      this.companyMembersStore.set(key, updated);
+      return updated;
+    },
+
+    delete: async (companyId: string, userId: string): Promise<boolean> => {
+      const key = `${companyId}:${userId}`;
+      const member = this.companyMembersStore.get(key);
+      if (!member) return false;
+
+      this.companyMembersStore.delete(key);
+
+      const userCompanies = this.userCompaniesIndex.get(userId);
+      if (userCompanies) {
+        userCompanies.delete(companyId);
+        if (userCompanies.size === 0) {
+          this.userCompaniesIndex.delete(userId);
+        }
+      }
+
       return true;
     },
   };
