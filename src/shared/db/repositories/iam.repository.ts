@@ -23,6 +23,8 @@ import type {
   EffectiveViewPermission,
   EffectiveFeaturePermission,
 } from '@vertical-vibing/shared-types';
+import { getPostgresClient } from '../postgres';
+import { PostgreSQLIAMDatabase } from './iam-postgres.repository';
 
 /**
  * IAM Database Interface
@@ -854,7 +856,7 @@ export class InMemoryIAMDatabase implements IAMDatabase {
         .map((id) => this.navTrailStore.get(id))
         .filter((e): e is NavTrailEntry => e !== undefined);
 
-      return entries.sort((a, b) => a.depth - b.depth);
+      return entries.sort((a, b) => Number(a.depth) - Number(b.depth));
     },
 
     findRecent: async (userId: string, limit: number): Promise<NavTrailEntry[]> => {
@@ -958,16 +960,23 @@ function createIAMDatabase(): IAMDatabase {
 
   console.log('[IAM Database] Using PostgreSQL persistence');
 
-  // Import PostgreSQL implementation
-  const { getPostgresClient } = require('../postgres');
-  const { PostgreSQLIAMDatabase } = require('./iam-postgres.repository');
-
   const db = getPostgresClient();
   return new PostgreSQLIAMDatabase(db);
 }
 
-// Export singleton instance (PostgreSQL only)
-export const iamDb = createIAMDatabase();
+// Lazy-loaded singleton instance (PostgreSQL only)
+let _iamDbInstance: IAMDatabase | null = null;
 
-// Export InMemoryIAMDatabase for testing purposes only
-export { InMemoryIAMDatabase };
+export const getIAMDb = (): IAMDatabase => {
+  if (!_iamDbInstance) {
+    _iamDbInstance = createIAMDatabase();
+  }
+  return _iamDbInstance;
+};
+
+// For backward compatibility - export as a getter
+export const iamDb = new Proxy({} as IAMDatabase, {
+  get(target, prop) {
+    return getIAMDb()[prop as keyof IAMDatabase];
+  }
+});

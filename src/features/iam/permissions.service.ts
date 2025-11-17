@@ -6,6 +6,7 @@
  * Merges permissions across multiple user levels
  */
 
+import crypto from 'crypto';
 import { db } from '../../shared/db/client';
 import type { PermissionState, ActionScope } from '@vertical-vibing/shared-types';
 
@@ -357,11 +358,13 @@ export class PermissionsService {
       for (const view of allViews) {
         const resolution = await this.resolveViewPermission(userId, view.id, companyId);
         await db.iam.effectiveViewPermissions.upsert({
+          id: crypto.randomUUID(),
           userId,
           companyId,
           viewId: view.id,
-          allowed: resolution.allowed,
+          hasAccess: resolution.allowed,
           computedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes cache
         });
       }
 
@@ -379,13 +382,15 @@ export class PermissionsService {
           );
 
           await db.iam.effectiveFeaturePermissions.upsert({
+            id: crypto.randomUUID(),
             userId,
             companyId,
             featureId: feature.id,
             action,
-            value: resolution.allowed,
+            allowed: resolution.allowed,
             scope: resolution.scope,
             computedAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes cache
           });
         }
       }

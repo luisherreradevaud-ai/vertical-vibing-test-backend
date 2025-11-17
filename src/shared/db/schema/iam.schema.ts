@@ -4,7 +4,7 @@
  * Production-ready PostgreSQL schema for IAM entities
  */
 
-import { pgTable, uuid, varchar, text, boolean, timestamp, primaryKey, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, boolean, timestamp, primaryKey, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ----- Core IAM Entities -----
@@ -165,7 +165,7 @@ export const userLevelViewPermissions = pgTable('user_level_view_permissions', {
 }, (table) => {
   return {
     companyUserLevelViewIdx: index('ulvp_company_level_view_idx').on(table.companyId, table.userLevelId, table.viewId),
-    companyUserLevelViewUnique: index('ulvp_unique_idx').on(table.companyId, table.userLevelId, table.viewId).unique(),
+    companyUserLevelViewUnique: uniqueIndex('ulvp_unique_idx').on(table.companyId, table.userLevelId, table.viewId),
     userLevelIdx: index('ulvp_user_level_idx').on(table.userLevelId),
     viewIdx: index('ulvp_view_idx').on(table.viewId),
   };
@@ -193,12 +193,12 @@ export const userLevelFeaturePermissions = pgTable('user_level_feature_permissio
       table.featureId,
       table.action
     ),
-    companyUserLevelFeatureActionUnique: index('ulfp_unique_idx').on(
+    companyUserLevelFeatureActionUnique: uniqueIndex('ulfp_unique_idx').on(
       table.companyId,
       table.userLevelId,
       table.featureId,
       table.action
-    ).unique(),
+    ),
     userLevelIdx: index('ulfp_user_level_idx').on(table.userLevelId),
     featureIdx: index('ulfp_feature_idx').on(table.featureId),
   };
@@ -233,11 +233,15 @@ export const menuItems = pgTable('menu_items', {
   priority: varchar('priority', { length: 20 }).default('standard').notNull(),
   requiredPermissions: text('required_permissions'), // JSON array
   sortOrder: varchar('sort_order', { length: 50 }),
+  viewId: uuid('view_id').references(() => views.id, { onDelete: 'set null' }), // Optional direct link to view
+  featureId: uuid('feature_id').references(() => features.id, { onDelete: 'set null' }), // Optional feature for permissions
+  isEntrypoint: boolean('is_entrypoint').default(true).notNull(), // Whether to show in navigation
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => {
   return {
     companyIdx: index('menu_items_company_idx').on(table.companyId),
+    viewIdx: index('menu_items_view_idx').on(table.viewId),
   };
 });
 
@@ -249,6 +253,7 @@ export const subMenuItems = pgTable('sub_menu_items', {
   menuItemId: uuid('menu_item_id').notNull().references(() => menuItems.id, { onDelete: 'cascade' }),
   label: varchar('label', { length: 255 }).notNull(),
   viewId: uuid('view_id').references(() => views.id, { onDelete: 'set null' }),
+  featureId: uuid('feature_id').references(() => features.id, { onDelete: 'set null' }), // Optional feature for permissions
   icon: varchar('icon', { length: 100 }),
   sortOrder: varchar('sort_order', { length: 50 }),
   enabled: boolean('enabled').default(true).notNull(),
@@ -298,7 +303,7 @@ export const effectiveViewPermissions = pgTable('effective_view_permissions', {
 }, (table) => {
   return {
     userCompanyViewIdx: index('evp_user_company_view_idx').on(table.userId, table.companyId, table.viewId),
-    userCompanyViewUnique: index('evp_unique_idx').on(table.userId, table.companyId, table.viewId).unique(),
+    userCompanyViewUnique: uniqueIndex('evp_unique_idx').on(table.userId, table.companyId, table.viewId),
     expiresIdx: index('evp_expires_idx').on(table.expiresAt), // For cleanup
   };
 });
@@ -324,12 +329,12 @@ export const effectiveFeaturePermissions = pgTable('effective_feature_permission
       table.featureId,
       table.action
     ),
-    userCompanyFeatureActionUnique: index('efp_unique_idx').on(
+    userCompanyFeatureActionUnique: uniqueIndex('efp_unique_idx').on(
       table.userId,
       table.companyId,
       table.featureId,
       table.action
-    ).unique(),
+    ),
     expiresIdx: index('efp_expires_idx').on(table.expiresAt), // For cleanup
   };
 });

@@ -45,6 +45,17 @@ export class ApiResponse {
   }
 
   /**
+   * Bad request response (400)
+   */
+  static badRequest(res: Response, message: string, code = 'ERR_VALIDATION_001') {
+    return res.status(400).json({
+      status: 'error',
+      code,
+      message,
+    });
+  }
+
+  /**
    * Validation error response
    */
   static validationError(res: Response, errors: Array<{ field: string; message: string; code?: string }>) {

@@ -235,6 +235,7 @@ router.post('/user-levels', authenticateJWT, enforceTenant, requireUserLevelMana
       companyId,
       name,
       description: description || '',
+      isDefault: false,
       createdAt: new Date().toISOString(),
     });
 
@@ -383,11 +384,13 @@ router.put('/user-levels/:id/permissions/views', authenticateJWT, enforceTenant,
 
     // Validate and format permissions
     const permissions = views.map((v) => ({
+      id: crypto.randomUUID(),
       companyId,
       userLevelId: id,
       viewId: v.viewId,
       state: v.state || 'inherit',
       modifiable: v.modifiable !== false,
+      createdAt: new Date().toISOString(),
     }));
 
     await db.iam.userLevelViewPermissions.replaceForUserLevel(id, companyId, permissions);
@@ -443,6 +446,7 @@ router.put('/user-levels/:id/permissions/features', authenticateJWT, enforceTena
 
     // Validate and format permissions
     const permissions = features.map((f) => ({
+      id: crypto.randomUUID(),
       companyId,
       userLevelId: id,
       featureId: f.featureId,
@@ -450,6 +454,7 @@ router.put('/user-levels/:id/permissions/features', authenticateJWT, enforceTena
       value: f.value !== false,
       scope: f.scope || 'any',
       modifiable: f.modifiable !== false,
+      createdAt: new Date().toISOString(),
     }));
 
     await db.iam.userLevelFeaturePermissions.replaceForUserLevel(id, companyId, permissions);

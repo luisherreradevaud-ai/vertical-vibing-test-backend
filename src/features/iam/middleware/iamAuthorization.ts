@@ -18,7 +18,7 @@ export async function requireUserLevelManagement(
 ) {
   try {
     const userId = req.user!.userId;
-    const companyId = req.user!.companyId || req.tenantId || '';
+    const companyId = req.tenantId || '';
 
     const canManage = await permissionsService.canPerformAction(
       userId,
@@ -48,7 +48,7 @@ export async function requirePermissionManagement(
 ) {
   try {
     const userId = req.user!.userId;
-    const companyId = req.user!.companyId || req.tenantId || '';
+    const companyId = req.tenantId || '';
 
     const canManage = await permissionsService.canPerformAction(
       userId,
@@ -78,7 +78,7 @@ export async function requireUserAssignment(
 ) {
   try {
     const userId = req.user!.userId;
-    const companyId = req.user!.companyId || req.tenantId || '';
+    const companyId = req.tenantId || '';
 
     const canManage = await permissionsService.canPerformAction(
       userId,
@@ -108,7 +108,7 @@ export async function requireIAMRead(
 ) {
   try {
     const userId = req.user!.userId;
-    const companyId = req.user!.companyId || req.tenantId || '';
+    const companyId = req.tenantId || '';
 
     // Check if user can read either user levels or permissions
     const [canReadLevels, canReadPerms] = await Promise.all([

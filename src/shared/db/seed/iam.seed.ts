@@ -6,108 +6,224 @@
 
 import { db } from '../client';
 import type { View, Feature, Module, MenuItem, SubMenuItem, UserLevel } from '@vertical-vibing/shared-types';
+import { randomUUID } from 'crypto';
+
+// Helper to get or create IDs
+let VIEW_IDS: Record<string, string>;
+let FEATURE_IDS: Record<string, string>;
+let MODULE_IDS: Record<string, string>;
+let MENU_IDS: Record<string, string>;
+let SUBMENU_IDS: Record<string, string>;
+
+async function initializeIds() {
+  // Fetch existing views and map by URL
+  const existingViews = await db.iam.views.findAll();
+  const viewsByUrl: Record<string, string> = {};
+  existingViews.forEach(v => {
+    const key = v.url.replace(/^\//, '').replace(/\//g, '_').replace(/:/g, '') || 'home';
+    viewsByUrl[key] = v.id;
+  });
+
+  VIEW_IDS = {
+    dashboard: viewsByUrl['dashboard'] || randomUUID(),
+    home: viewsByUrl['home'] || randomUUID(),
+    companies_list: viewsByUrl['companies'] || randomUUID(),
+    company_detail: viewsByUrl['companies_id'] || randomUUID(),
+    users_list: viewsByUrl['users'] || randomUUID(),
+    user_profile: viewsByUrl['profile'] || randomUUID(),
+    subscription: viewsByUrl['subscription'] || randomUUID(),
+    subscription_plans: viewsByUrl['subscription_plans'] || randomUUID(),
+    user_levels: viewsByUrl['user_levels'] || randomUUID(),
+    permissions_matrix: viewsByUrl['permissions_matrix'] || randomUUID(),
+    settings: viewsByUrl['settings'] || randomUUID(),
+    risks: viewsByUrl['risks'] || randomUUID(),
+    compliance: viewsByUrl['compliance'] || randomUUID(),
+    audit: viewsByUrl['audit'] || randomUUID(),
+  };
+
+  // Fetch existing features and map by key
+  const existingFeatures = await db.iam.features.findAll();
+  const featuresByKey: Record<string, string> = {};
+  existingFeatures.forEach(f => {
+    if (f.key) {
+      const key = f.key.replace(/\./g, '_');
+      featuresByKey[key] = f.id;
+    }
+  });
+
+  FEATURE_IDS = {
+    create: featuresByKey['general_create'] || randomUUID(),
+    read: featuresByKey['general_read'] || randomUUID(),
+    update: featuresByKey['general_update'] || randomUUID(),
+    delete: featuresByKey['general_delete'] || randomUUID(),
+    export: featuresByKey['general_export'] || randomUUID(),
+    company_create: featuresByKey['company_create'] || randomUUID(),
+    company_manage: featuresByKey['company_manage'] || randomUUID(),
+    company_delete: featuresByKey['company_delete'] || randomUUID(),
+    user_invite: featuresByKey['user_invite'] || randomUUID(),
+    user_manage: featuresByKey['user_manage'] || randomUUID(),
+    user_remove: featuresByKey['user_remove'] || randomUUID(),
+    subscription_manage: featuresByKey['subscription_manage'] || randomUUID(),
+    subscription_billing: featuresByKey['subscription_billing'] || randomUUID(),
+    iam_manage_levels: featuresByKey['iam_manage_levels'] || randomUUID(),
+    iam_assign_permissions: featuresByKey['iam_assign_permissions'] || randomUUID(),
+    risks_create: featuresByKey['risks_create'] || randomUUID(),
+    risks_edit: featuresByKey['risks_edit'] || randomUUID(),
+    risks_delete: featuresByKey['risks_delete'] || randomUUID(),
+    risks_approve: featuresByKey['risks_approve'] || randomUUID(),
+  };
+
+  // Fetch existing modules and map by code
+  const existingModules = await db.iam.modules.findAll();
+  const modulesByCode: Record<string, string> = {};
+  existingModules.forEach(m => {
+    modulesByCode[m.code] = m.id;
+  });
+
+  MODULE_IDS = {
+    core: modulesByCode['core'] || randomUUID(),
+    risks: modulesByCode['risks'] || randomUUID(),
+    compliance: modulesByCode['compliance'] || randomUUID(),
+    audit: modulesByCode['audit'] || randomUUID(),
+  };
+
+  // Fetch existing menu items (global menu items have companyId = null)
+  const existingMenuItems = await db.iam.menuItems.findAll(null);
+  const menusByLabel: Record<string, string> = {};
+  existingMenuItems.forEach(m => {
+    const key = m.label.toLowerCase().replace(/\s+/g, '_');
+    menusByLabel[key] = m.id;
+  });
+
+  MENU_IDS = {
+    dashboard: menusByLabel['dashboard'] || randomUUID(),
+    companies: menusByLabel['companies'] || randomUUID(),
+    users: menusByLabel['users'] || randomUUID(),
+    modules: menusByLabel['modules'] || randomUUID(),
+    admin: menusByLabel['admin'] || randomUUID(),
+    settings: menusByLabel['settings'] || randomUUID(),
+  };
+
+  // For submenu items, we'll just generate new UUIDs if they don't exist
+  // (they'll be fetched when needed during the seed)
+  SUBMENU_IDS = {
+    risks: randomUUID(),
+    compliance: randomUUID(),
+    audit: randomUUID(),
+    user_levels: randomUUID(),
+    permissions: randomUUID(),
+    subscription: randomUUID(),
+  };
+}
 
 /**
  * Seed baseline Views (pages/routes)
  */
 async function seedViews(): Promise<void> {
+  // Check if views already exist
+  const existingViews = await db.iam.views.findAll();
+  if (existingViews.length > 0) {
+    console.log(`⏭️  Skipping views seed (${existingViews.length} already exist)`);
+    return;
+  }
+
   const views: View[] = [
     // Dashboard & Home
     {
-      id: 'view_dashboard',
+      id: VIEW_IDS.dashboard,
       name: 'Dashboard',
       url: '/dashboard',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'view_home',
+      id: VIEW_IDS.home,
       name: 'Home',
       url: '/home',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // Companies Management
     {
-      id: 'view_companies_list',
+      id: VIEW_IDS.companies_list,
       name: 'Companies List',
       url: '/companies',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'view_company_detail',
+      id: VIEW_IDS.company_detail,
       name: 'Company Detail',
       url: '/companies/:id',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // User Management
     {
-      id: 'view_users_list',
+      id: VIEW_IDS.users_list,
       name: 'Users List',
       url: '/users',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'view_user_profile',
+      id: VIEW_IDS.user_profile,
       name: 'User Profile',
       url: '/profile',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // Subscription Management
     {
-      id: 'view_subscription',
+      id: VIEW_IDS.subscription,
       name: 'Subscription',
       url: '/subscription',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'view_subscription_plans',
+      id: VIEW_IDS.subscription_plans,
       name: 'Subscription Plans',
       url: '/subscription/plans',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // IAM Management (Client Admin)
     {
-      id: 'view_user_levels',
+      id: VIEW_IDS.user_levels,
       name: 'User Levels',
       url: '/admin/user-levels',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'view_permissions_matrix',
+      id: VIEW_IDS.permissions_matrix,
       name: 'Permissions Matrix',
       url: '/admin/permissions',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // Settings
     {
-      id: 'view_settings',
+      id: VIEW_IDS.settings,
       name: 'Settings',
       url: '/settings',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // Example Module Views (for use cases from the roadmap)
     {
-      id: 'view_risks',
+      id: VIEW_IDS.risks,
       name: 'Risks',
       url: '/modules/risks',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'view_compliance',
+      id: VIEW_IDS.compliance,
       name: 'Compliance',
       url: '/modules/compliance',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'view_audit',
+      id: VIEW_IDS.audit,
       name: 'Audit',
       url: '/modules/audit',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
   ];
 
@@ -122,150 +238,157 @@ async function seedViews(): Promise<void> {
  * Seed baseline Features (actions/capabilities)
  */
 async function seedFeatures(): Promise<void> {
+  // Check if features already exist
+  const existingFeatures = await db.iam.features.findAll();
+  if (existingFeatures.length > 0) {
+    console.log(`⏭️  Skipping features seed (${existingFeatures.length} already exist)`);
+    return;
+  }
+
   const features: Feature[] = [
     // General CRUD features
     {
-      id: 'feature_create',
+      id: FEATURE_IDS.create,
       name: 'Create',
       key: 'general.create',
       description: 'Create new records',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_read',
+      id: FEATURE_IDS.read,
       name: 'Read',
       key: 'general.read',
       description: 'View records',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_update',
+      id: FEATURE_IDS.update,
       name: 'Update',
       key: 'general.update',
       description: 'Edit existing records',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_delete',
+      id: FEATURE_IDS.delete,
       name: 'Delete',
       key: 'general.delete',
       description: 'Delete records',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_export',
+      id: FEATURE_IDS.export,
       name: 'Export',
       key: 'general.export',
       description: 'Export data',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // Company-specific features
     {
-      id: 'feature_company_create',
+      id: FEATURE_IDS.company_create,
       name: 'Create Company',
       key: 'companies.create',
       description: 'Create new companies',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_company_manage',
+      id: FEATURE_IDS.company_manage,
       name: 'Manage Company',
       key: 'companies.manage',
       description: 'Edit company details',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_company_delete',
+      id: FEATURE_IDS.company_delete,
       name: 'Delete Company',
       key: 'companies.delete',
       description: 'Delete companies',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // User management features
     {
-      id: 'feature_user_invite',
+      id: FEATURE_IDS.user_invite,
       name: 'Invite Users',
       key: 'users.invite',
       description: 'Invite new users to the company',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_user_manage',
+      id: FEATURE_IDS.user_manage,
       name: 'Manage Users',
       key: 'users.manage',
       description: 'Edit user details and roles',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_user_remove',
+      id: FEATURE_IDS.user_remove,
       name: 'Remove Users',
       key: 'users.remove',
       description: 'Remove users from the company',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // Subscription features
     {
-      id: 'feature_subscription_manage',
+      id: FEATURE_IDS.subscription_manage,
       name: 'Manage Subscription',
       key: 'subscription.manage',
       description: 'Change subscription plan',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_subscription_billing',
+      id: FEATURE_IDS.subscription_billing,
       name: 'View Billing',
       key: 'subscription.billing',
       description: 'View billing information',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // IAM features
     {
-      id: 'feature_iam_manage_levels',
+      id: FEATURE_IDS.iam_manage_levels,
       name: 'Manage User Levels',
       key: 'iam.manage_levels',
       description: 'Create and edit user levels/roles',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_iam_assign_permissions',
+      id: FEATURE_IDS.iam_assign_permissions,
       name: 'Assign Permissions',
       key: 'iam.assign_permissions',
       description: 'Configure permissions for user levels',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
 
     // Module-specific features (Risks example)
     {
-      id: 'feature_risks_create',
+      id: FEATURE_IDS.risks_create,
       name: 'Create Risks',
       key: 'risks.create',
       description: 'Create new risk entries',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_risks_edit',
+      id: FEATURE_IDS.risks_edit,
       name: 'Edit Risks',
       key: 'risks.edit',
       description: 'Edit risk entries',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_risks_delete',
+      id: FEATURE_IDS.risks_delete,
       name: 'Delete Risks',
       key: 'risks.delete',
       description: 'Delete risk entries',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'feature_risks_approve',
+      id: FEATURE_IDS.risks_approve,
       name: 'Approve Risks',
       key: 'risks.approve',
       description: 'Approve risk assessments',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
   ];
 
@@ -280,34 +403,41 @@ async function seedFeatures(): Promise<void> {
  * Seed baseline Modules
  */
 async function seedModules(): Promise<void> {
+  // Check if modules already exist
+  const existingModules = await db.iam.modules.findAll();
+  if (existingModules.length > 0) {
+    console.log(`⏭️  Skipping modules seed (${existingModules.length} already exist)`);
+    return;
+  }
+
   const modules: Module[] = [
     {
-      id: 'module_core',
+      id: MODULE_IDS.core,
       name: 'Core Platform',
       code: 'core',
       description: 'Essential platform features - always included',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'module_risks',
+      id: MODULE_IDS.risks,
       name: 'Risk Management',
       code: 'risks',
       description: 'Risk assessment and tracking module',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'module_compliance',
+      id: MODULE_IDS.compliance,
       name: 'Compliance Management',
       code: 'compliance',
       description: 'Regulatory compliance tracking',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
-      id: 'module_audit',
+      id: MODULE_IDS.audit,
       name: 'Audit Management',
       code: 'audit',
       description: 'Internal and external audit tracking',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
   ];
 
@@ -322,32 +452,42 @@ async function seedModules(): Promise<void> {
  * Create Feature-View mappings
  */
 async function seedFeatureViewMappings(): Promise<void> {
+  // Check if mappings already exist by checking if any feature has views
+  const features = await db.iam.features.findAll();
+  if (features.length > 0) {
+    const viewsForFirstFeature = await db.iam.feature2Views.getViewsByFeature(features[0].id);
+    if (viewsForFirstFeature.length > 0) {
+      console.log(`⏭️  Skipping feature-view mappings seed (mappings already exist)`);
+      return;
+    }
+  }
+
   const mappings: Array<{ featureId: string; viewId: string }> = [
     // General CRUD features apply to most views
-    { featureId: 'feature_create', viewId: 'view_companies_list' },
-    { featureId: 'feature_read', viewId: 'view_companies_list' },
-    { featureId: 'feature_update', viewId: 'view_company_detail' },
-    { featureId: 'feature_delete', viewId: 'view_company_detail' },
+    { featureId: FEATURE_IDS.create, viewId: VIEW_IDS.companies_list },
+    { featureId: FEATURE_IDS.read, viewId: VIEW_IDS.companies_list },
+    { featureId: FEATURE_IDS.update, viewId: VIEW_IDS.company_detail },
+    { featureId: FEATURE_IDS.delete, viewId: VIEW_IDS.company_detail },
 
     // Company-specific features
-    { featureId: 'feature_company_create', viewId: 'view_companies_list' },
-    { featureId: 'feature_company_manage', viewId: 'view_company_detail' },
-    { featureId: 'feature_company_delete', viewId: 'view_company_detail' },
+    { featureId: FEATURE_IDS.company_create, viewId: VIEW_IDS.companies_list },
+    { featureId: FEATURE_IDS.company_manage, viewId: VIEW_IDS.company_detail },
+    { featureId: FEATURE_IDS.company_delete, viewId: VIEW_IDS.company_detail },
 
     // User management features
-    { featureId: 'feature_user_invite', viewId: 'view_users_list' },
-    { featureId: 'feature_user_manage', viewId: 'view_users_list' },
-    { featureId: 'feature_user_remove', viewId: 'view_users_list' },
+    { featureId: FEATURE_IDS.user_invite, viewId: VIEW_IDS.users_list },
+    { featureId: FEATURE_IDS.user_manage, viewId: VIEW_IDS.users_list },
+    { featureId: FEATURE_IDS.user_remove, viewId: VIEW_IDS.users_list },
 
     // IAM features
-    { featureId: 'feature_iam_manage_levels', viewId: 'view_user_levels' },
-    { featureId: 'feature_iam_assign_permissions', viewId: 'view_permissions_matrix' },
+    { featureId: FEATURE_IDS.iam_manage_levels, viewId: VIEW_IDS.user_levels },
+    { featureId: FEATURE_IDS.iam_assign_permissions, viewId: VIEW_IDS.permissions_matrix },
 
     // Risks features
-    { featureId: 'feature_risks_create', viewId: 'view_risks' },
-    { featureId: 'feature_risks_edit', viewId: 'view_risks' },
-    { featureId: 'feature_risks_delete', viewId: 'view_risks' },
-    { featureId: 'feature_risks_approve', viewId: 'view_risks' },
+    { featureId: FEATURE_IDS.risks_create, viewId: VIEW_IDS.risks },
+    { featureId: FEATURE_IDS.risks_edit, viewId: VIEW_IDS.risks },
+    { featureId: FEATURE_IDS.risks_delete, viewId: VIEW_IDS.risks },
+    { featureId: FEATURE_IDS.risks_approve, viewId: VIEW_IDS.risks },
   ];
 
   for (const { featureId, viewId } of mappings) {
@@ -361,28 +501,38 @@ async function seedFeatureViewMappings(): Promise<void> {
  * Create Module-View mappings
  */
 async function seedModuleViewMappings(): Promise<void> {
+  // Check if mappings already exist by checking if any module has views
+  const modules = await db.iam.modules.findAll();
+  if (modules.length > 0) {
+    const viewsForFirstModule = await db.iam.module2Views.getViewsByModule(modules[0].id);
+    if (viewsForFirstModule.length > 0) {
+      console.log(`⏭️  Skipping module-view mappings seed (mappings already exist)`);
+      return;
+    }
+  }
+
   const mappings: Array<{ moduleId: string; viewId: string }> = [
     // Core module - essential views
-    { moduleId: 'module_core', viewId: 'view_dashboard' },
-    { moduleId: 'module_core', viewId: 'view_home' },
-    { moduleId: 'module_core', viewId: 'view_companies_list' },
-    { moduleId: 'module_core', viewId: 'view_company_detail' },
-    { moduleId: 'module_core', viewId: 'view_users_list' },
-    { moduleId: 'module_core', viewId: 'view_user_profile' },
-    { moduleId: 'module_core', viewId: 'view_subscription' },
-    { moduleId: 'module_core', viewId: 'view_subscription_plans' },
-    { moduleId: 'module_core', viewId: 'view_user_levels' },
-    { moduleId: 'module_core', viewId: 'view_permissions_matrix' },
-    { moduleId: 'module_core', viewId: 'view_settings' },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.dashboard },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.home },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.companies_list },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.company_detail },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.users_list },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.user_profile },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.subscription },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.subscription_plans },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.user_levels },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.permissions_matrix },
+    { moduleId: MODULE_IDS.core, viewId: VIEW_IDS.settings },
 
     // Risks module
-    { moduleId: 'module_risks', viewId: 'view_risks' },
+    { moduleId: MODULE_IDS.risks, viewId: VIEW_IDS.risks },
 
     // Compliance module
-    { moduleId: 'module_compliance', viewId: 'view_compliance' },
+    { moduleId: MODULE_IDS.compliance, viewId: VIEW_IDS.compliance },
 
     // Audit module
-    { moduleId: 'module_audit', viewId: 'view_audit' },
+    { moduleId: MODULE_IDS.audit, viewId: VIEW_IDS.audit },
   ];
 
   for (const { moduleId, viewId } of mappings) {
@@ -396,39 +546,46 @@ async function seedModuleViewMappings(): Promise<void> {
  * Seed default menu structure (global)
  */
 async function seedDefaultMenu(): Promise<void> {
+  // Check if menu items already exist
+  const existingMenuItems = await db.iam.menuItems.findAll();
+  if (existingMenuItems.length > 0) {
+    console.log(`⏭️  Skipping menu seed (${existingMenuItems.length} already exist)`);
+    return;
+  }
+
   const menuItems: MenuItem[] = [
     {
-      id: 'menu_dashboard',
+      id: MENU_IDS.dashboard,
       companyId: null, // Global menu
       label: 'Dashboard',
       sequenceIndex: 0,
-      viewId: 'view_dashboard',
+      viewId: VIEW_IDS.dashboard,
       featureId: null,
       isEntrypoint: true,
       icon: 'dashboard',
     },
     {
-      id: 'menu_companies',
+      id: MENU_IDS.companies,
       companyId: null,
       label: 'Companies',
       sequenceIndex: 1,
-      viewId: 'view_companies_list',
+      viewId: VIEW_IDS.companies_list,
       featureId: null,
       isEntrypoint: false,
       icon: 'business',
     },
     {
-      id: 'menu_users',
+      id: MENU_IDS.users,
       companyId: null,
       label: 'Users',
       sequenceIndex: 2,
-      viewId: 'view_users_list',
+      viewId: VIEW_IDS.users_list,
       featureId: null,
       isEntrypoint: false,
       icon: 'people',
     },
     {
-      id: 'menu_modules',
+      id: MENU_IDS.modules,
       companyId: null,
       label: 'Modules',
       sequenceIndex: 3,
@@ -438,7 +595,7 @@ async function seedDefaultMenu(): Promise<void> {
       icon: 'apps',
     },
     {
-      id: 'menu_admin',
+      id: MENU_IDS.admin,
       companyId: null,
       label: 'Administration',
       sequenceIndex: 4,
@@ -448,11 +605,11 @@ async function seedDefaultMenu(): Promise<void> {
       icon: 'admin_panel_settings',
     },
     {
-      id: 'menu_settings',
+      id: MENU_IDS.settings,
       companyId: null,
       label: 'Settings',
       sequenceIndex: 5,
-      viewId: 'view_settings',
+      viewId: VIEW_IDS.settings,
       featureId: null,
       isEntrypoint: false,
       icon: 'settings',
@@ -462,59 +619,59 @@ async function seedDefaultMenu(): Promise<void> {
   const subMenuItems: SubMenuItem[] = [
     // Modules sub-menu
     {
-      id: 'submenu_risks',
+      id: SUBMENU_IDS.risks,
       companyId: null,
-      menuItemId: 'menu_modules',
+      menuItemId: MENU_IDS.modules,
       label: 'Risks',
       sequenceIndex: 0,
-      viewId: 'view_risks',
+      viewId: VIEW_IDS.risks,
       featureId: null,
     },
     {
-      id: 'submenu_compliance',
+      id: SUBMENU_IDS.compliance,
       companyId: null,
-      menuItemId: 'menu_modules',
+      menuItemId: MENU_IDS.modules,
       label: 'Compliance',
       sequenceIndex: 1,
-      viewId: 'view_compliance',
+      viewId: VIEW_IDS.compliance,
       featureId: null,
     },
     {
-      id: 'submenu_audit',
+      id: SUBMENU_IDS.audit,
       companyId: null,
-      menuItemId: 'menu_modules',
+      menuItemId: MENU_IDS.modules,
       label: 'Audit',
       sequenceIndex: 2,
-      viewId: 'view_audit',
+      viewId: VIEW_IDS.audit,
       featureId: null,
     },
 
     // Administration sub-menu
     {
-      id: 'submenu_user_levels',
+      id: SUBMENU_IDS.user_levels,
       companyId: null,
-      menuItemId: 'menu_admin',
+      menuItemId: MENU_IDS.admin,
       label: 'User Levels',
       sequenceIndex: 0,
-      viewId: 'view_user_levels',
-      featureId: 'feature_iam_manage_levels',
+      viewId: VIEW_IDS.user_levels,
+      featureId: FEATURE_IDS.iam_manage_levels,
     },
     {
-      id: 'submenu_permissions',
+      id: SUBMENU_IDS.permissions,
       companyId: null,
-      menuItemId: 'menu_admin',
+      menuItemId: MENU_IDS.admin,
       label: 'Permissions',
       sequenceIndex: 1,
-      viewId: 'view_permissions_matrix',
-      featureId: 'feature_iam_assign_permissions',
+      viewId: VIEW_IDS.permissions_matrix,
+      featureId: FEATURE_IDS.iam_assign_permissions,
     },
     {
-      id: 'submenu_subscription',
+      id: SUBMENU_IDS.subscription,
       companyId: null,
-      menuItemId: 'menu_settings',
+      menuItemId: MENU_IDS.settings,
       label: 'Subscription',
       sequenceIndex: 0,
-      viewId: 'view_subscription',
+      viewId: VIEW_IDS.subscription,
       featureId: null,
     },
   ];
@@ -540,19 +697,19 @@ export async function seedDefaultUserLevelsForCompany(companyId: string): Promis
       companyId,
       name: 'Admin',
       description: 'Full access to all features and settings',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
       companyId,
       name: 'Member',
       description: 'Standard user with create, read, and update permissions',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
     {
       companyId,
       name: 'Visitor',
       description: 'Read-only access - can view but not edit or delete',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     },
   ];
 
@@ -733,6 +890,9 @@ export async function seedIAMData(): Promise<void> {
   console.log('🌱 Starting IAM seed...');
 
   try {
+    // Initialize IDs from existing data first
+    await initializeIds();
+
     await seedViews();
     await seedFeatures();
     await seedModules();

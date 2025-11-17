@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { rateLimitStore } from '../utils/rateLimit';
 import { db } from '../db/client';
-import type { PlanTier } from '@vertical-vibing/shared-types';
+import { PlanTier } from '@vertical-vibing/shared-types';
 
 /**
  * Rate Limiting Middleware
@@ -31,7 +31,7 @@ export async function rateLimitMiddleware(
 
     if (!userId) {
       // No authenticated user - apply strictest limit (free tier)
-      const result = rateLimitStore.increment('anonymous', 'free');
+      const result = rateLimitStore.increment('anonymous', PlanTier.FREE);
 
       // Add rate limit headers
       res.setHeader('X-RateLimit-Limit', result.limit.toString());
@@ -56,7 +56,7 @@ export async function rateLimitMiddleware(
 
     // Get user's subscription tier
     const subscription = await db.subscriptions.findByUserId(userId);
-    const tier: PlanTier = subscription?.planTier || 'free';
+    const tier: PlanTier = subscription?.planTier || PlanTier.FREE;
 
     // Check and increment rate limit
     const result = rateLimitStore.increment(userId, tier);
@@ -106,7 +106,7 @@ export async function rateLimitHeadersOnly(
     }
 
     const subscription = await db.subscriptions.findByUserId(userId);
-    const tier: PlanTier = subscription?.planTier || 'free';
+    const tier: PlanTier = subscription?.planTier || PlanTier.FREE;
 
     const info = rateLimitStore.get(userId, tier);
 

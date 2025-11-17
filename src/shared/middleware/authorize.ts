@@ -17,20 +17,7 @@ interface AuthorizeOptions {
   action?: string; // Action to check (only with feature)
 }
 
-/**
- * Extend Express Request to include user and company context
- */
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        userId: string;
-        email: string;
-        companyId?: string;
-      };
-    }
-  }
-}
+// Note: Express Request.user type is defined in auth.ts middleware
 
 /**
  * Main authorization middleware factory
@@ -54,7 +41,7 @@ export function authorize(options: AuthorizeOptions) {
       }
 
       const { userId } = req.user;
-      const companyId = req.user.companyId || getCompanyIdFromRequest(req);
+      const companyId = req.tenantId || getCompanyIdFromRequest(req);
 
       if (!companyId) {
         res.status(400).json({
@@ -165,7 +152,7 @@ export function authorizeOwn(featureId: string, action: string, resourceUserIdPa
         return;
       }
 
-      const companyId = req.user.companyId || getCompanyIdFromRequest(req);
+      const companyId = req.tenantId || getCompanyIdFromRequest(req);
 
       if (!companyId) {
         res.status(400).json({
@@ -226,7 +213,7 @@ export function requireModule(moduleCode: string) {
         return;
       }
 
-      const companyId = req.user.companyId || getCompanyIdFromRequest(req);
+      const companyId = req.tenantId || getCompanyIdFromRequest(req);
 
       if (!companyId) {
         res.status(400).json({
@@ -327,7 +314,6 @@ export function requireSuperadmin() {
  */
 function getCompanyIdFromRequest(req: Request): string | undefined {
   return (
-    req.user?.companyId ||
     (req.query.companyId as string) ||
     (req.body?.companyId as string) ||
     undefined
@@ -347,7 +333,7 @@ export async function checkPermission(
   }
 
   const { userId } = req.user;
-  const companyId = req.user.companyId || getCompanyIdFromRequest(req);
+  const companyId = req.tenantId || getCompanyIdFromRequest(req);
 
   if (!companyId) {
     return { allowed: false, reason: 'No company context' };

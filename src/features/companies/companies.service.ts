@@ -1,6 +1,7 @@
 import { db } from '../../shared/db/client';
 import { CompaniesRepository } from '../../shared/db/repositories/companies.repository';
-import type { Company, CompanyMember, CompanyRole, CompanyWithMembers } from '@vertical-vibing/shared-types';
+import { CompanyRole } from '@vertical-vibing/shared-types';
+import type { Company, CompanyMember, CompanyWithMembers } from '@vertical-vibing/shared-types';
 
 export class CompaniesService {
   private companiesRepo: CompaniesRepository;
@@ -36,7 +37,7 @@ export class CompaniesService {
       id: crypto.randomUUID(),
       companyId: company.id,
       userId: data.ownerId,
-      role: 'owner',
+      role: CompanyRole.OWNER,
     });
 
     return company;

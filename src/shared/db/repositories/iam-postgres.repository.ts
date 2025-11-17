@@ -69,7 +69,7 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           requiresAuth: view.requiresAuth,
           createdAt: view.createdAt,
           updatedAt: view.updatedAt,
-        })
+        } as any)
         .returning();
 
       return this.mapViewFromDb(results[0]);
@@ -130,15 +130,12 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
       const results = await this.db
         .insert(schema.modules)
         .values({
-          id: module.id,
           code: module.code,
           name: module.name,
           description: module.description ?? null,
           icon: module.icon ?? null,
           enabled: module.enabled,
           priority: module.priority,
-          createdAt: module.createdAt,
-          updatedAt: module.updatedAt,
         })
         .returning();
 
@@ -210,7 +207,7 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           enabled: feature.enabled,
           createdAt: feature.createdAt,
           updatedAt: feature.updatedAt,
-        })
+        } as any)
         .returning();
 
       return this.mapFeatureFromDb(results[0]);
@@ -293,7 +290,7 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           isDefault: userLevel.isDefault,
           createdAt: userLevel.createdAt,
           updatedAt: userLevel.updatedAt,
-        })
+        } as any)
         .returning();
 
       return this.mapUserLevelFromDb(results[0]);
@@ -624,14 +621,11 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
       await this.db
         .insert(schema.userLevelViewPermissions)
         .values({
-          id: permission.id,
           companyId: permission.companyId,
           userLevelId: permission.userLevelId,
           viewId: permission.viewId,
           state: permission.state,
           modifiable: permission.modifiable,
-          createdAt: permission.createdAt,
-          updatedAt: permission.updatedAt,
         })
         .onConflictDoUpdate({
           target: [
@@ -678,14 +672,11 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
         await this.db
           .insert(schema.userLevelViewPermissions)
           .values(permissions.map(p => ({
-            id: p.id,
             companyId: p.companyId,
             userLevelId: p.userLevelId,
             viewId: p.viewId,
             state: p.state,
             modifiable: p.modifiable,
-            createdAt: p.createdAt,
-            updatedAt: p.updatedAt,
           })));
       }
     },
@@ -741,7 +732,6 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
       await this.db
         .insert(schema.userLevelFeaturePermissions)
         .values({
-          id: permission.id,
           companyId: permission.companyId,
           userLevelId: permission.userLevelId,
           featureId: permission.featureId,
@@ -749,8 +739,6 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           value: permission.value,
           scope: permission.scope,
           modifiable: permission.modifiable,
-          createdAt: permission.createdAt,
-          updatedAt: permission.updatedAt,
         })
         .onConflictDoUpdate({
           target: [
@@ -805,7 +793,6 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
         await this.db
           .insert(schema.userLevelFeaturePermissions)
           .values(permissions.map(p => ({
-            id: p.id,
             companyId: p.companyId,
             userLevelId: p.userLevelId,
             featureId: p.featureId,
@@ -813,8 +800,6 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
             value: p.value,
             scope: p.scope,
             modifiable: p.modifiable,
-            createdAt: p.createdAt,
-            updatedAt: p.updatedAt,
           })));
       }
     },
@@ -913,15 +898,15 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
       const results = await this.db
         .insert(schema.menuItems)
         .values({
-          id: menuItem.id,
           companyId: menuItem.companyId ?? null,
           label: menuItem.label,
           icon: menuItem.icon ?? null,
           priority: menuItem.priority,
           requiredPermissions: menuItem.requiredPermissions ? JSON.stringify(menuItem.requiredPermissions) : null,
           sortOrder: menuItem.sortOrder ?? null,
-          createdAt: menuItem.createdAt,
-          updatedAt: menuItem.updatedAt,
+          viewId: menuItem.viewId ?? null,
+          featureId: menuItem.featureId ?? null,
+          isEntrypoint: menuItem.isEntrypoint,
         })
         .returning();
 
@@ -981,15 +966,13 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
       const results = await this.db
         .insert(schema.subMenuItems)
         .values({
-          id: subMenuItem.id,
           menuItemId: subMenuItem.menuItemId,
           label: subMenuItem.label,
           viewId: subMenuItem.viewId ?? null,
+          featureId: subMenuItem.featureId ?? null,
           icon: subMenuItem.icon ?? null,
           sortOrder: subMenuItem.sortOrder ?? null,
           enabled: subMenuItem.enabled,
-          createdAt: subMenuItem.createdAt,
-          updatedAt: subMenuItem.updatedAt,
         })
         .returning();
 
@@ -1050,14 +1033,12 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
       await this.db
         .insert(schema.navTrail)
         .values({
-          id: entry.id,
           userId: entry.userId,
           sessionId: entry.sessionId,
           viewId: entry.viewId ?? null,
           url: entry.url,
           label: entry.label,
           depth: entry.depth,
-          createdAt: entry.createdAt,
         });
     },
 
@@ -1103,7 +1084,7 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           hasAccess: permission.hasAccess,
           computedAt: permission.computedAt,
           expiresAt: permission.expiresAt,
-        })
+        } as any)
         .onConflictDoUpdate({
           target: [
             schema.effectiveViewPermissions.userId,
@@ -1112,8 +1093,8 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           ],
           set: {
             hasAccess: permission.hasAccess,
-            computedAt: permission.computedAt,
-            expiresAt: permission.expiresAt,
+            computedAt: permission.computedAt as any,
+            expiresAt: permission.expiresAt as any,
           },
         });
     },
@@ -1164,7 +1145,7 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           scope: permission.scope,
           computedAt: permission.computedAt,
           expiresAt: permission.expiresAt,
-        })
+        } as any)
         .onConflictDoUpdate({
           target: [
             schema.effectiveFeaturePermissions.userId,
@@ -1175,8 +1156,8 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
           set: {
             allowed: permission.allowed,
             scope: permission.scope,
-            computedAt: permission.computedAt,
-            expiresAt: permission.expiresAt,
+            computedAt: permission.computedAt as any,
+            expiresAt: permission.expiresAt as any,
           },
         });
     },
@@ -1271,6 +1252,9 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
     priority: row.priority,
     requiredPermissions: row.requiredPermissions ? JSON.parse(row.requiredPermissions) : undefined,
     sortOrder: row.sortOrder ?? undefined,
+    viewId: row.viewId ?? undefined,
+    featureId: row.featureId ?? undefined,
+    isEntrypoint: row.isEntrypoint,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -1280,6 +1264,7 @@ export class PostgreSQLIAMDatabase implements IAMDatabase {
     menuItemId: row.menuItemId,
     label: row.label,
     viewId: row.viewId ?? undefined,
+    featureId: row.featureId ?? undefined,
     icon: row.icon ?? undefined,
     sortOrder: row.sortOrder ?? undefined,
     enabled: row.enabled,

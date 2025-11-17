@@ -4,30 +4,29 @@
  * Configures and exports the Drizzle ORM PostgreSQL client
  */
 
-import { drizzle } from 'drizzle-orm/postgres-js';
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import * as iamSchema from './schema/iam.schema';
-
-// Database URL from environment (required)
-const DATABASE_URL = process.env.DATABASE_URL;
-
-if (!DATABASE_URL) {
-  throw new Error(
-    'DATABASE_URL is required. Please set it in your .env file.\n' +
-    'Example: DATABASE_URL=postgresql://user:password@localhost:5432/vertical_vibing'
-  );
-}
 
 /**
  * PostgreSQL client connection
  */
 let pgClient: postgres.Sql | null = null;
-let drizzleDb: ReturnType<typeof drizzle> | null = null;
+let drizzleDb: PostgresJsDatabase<typeof iamSchema> | null = null;
 
 /**
  * Get or create PostgreSQL connection
  */
 export function getPostgresClient() {
+  const DATABASE_URL = process.env.DATABASE_URL;
+
+  if (!DATABASE_URL) {
+    throw new Error(
+      'DATABASE_URL is required. Please set it in your .env file.\n' +
+      'Example: DATABASE_URL=postgresql://user:password@localhost:5432/vertical_vibing'
+    );
+  }
 
   if (!pgClient) {
     console.log('[Database] Connecting to PostgreSQL...');
@@ -68,7 +67,7 @@ export async function closePostgresClient() {
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
     const db = getPostgresClient();
-    await db.execute(postgres.sql`SELECT 1`);
+    await db.execute(sql`SELECT 1`);
     return true;
   } catch (error) {
     console.error('[Database] Health check failed:', error);

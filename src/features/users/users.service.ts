@@ -1,6 +1,6 @@
 import type { UsersRepository } from '../../shared/db/repositories/users.repository';
-import type { UpdateProfileDto, ChangePasswordDto } from '@vertical-vibing/shared-types';
-import type { User, PublicUser } from '@vertical-vibing/shared-types';
+import type { UpdateProfileDTO, ChangePasswordDTO, PublicUser } from '@vertical-vibing/shared-types';
+import type { User } from '../../shared/db/schema/users.schema';
 import { hashPassword, verifyPassword } from '../../shared/utils/password';
 
 /**
@@ -25,7 +25,7 @@ export class UsersService {
   /**
    * Update user profile
    */
-  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<PublicUser | null> {
+  async updateProfile(userId: string, dto: UpdateProfileDTO): Promise<PublicUser | null> {
     // Check if email is being changed and if it's already taken
     if (dto.email) {
       const existingUser = await this.usersRepository.findByEmail(dto.email);
@@ -49,7 +49,7 @@ export class UsersService {
   /**
    * Change user password
    */
-  async changePassword(userId: string, dto: ChangePasswordDto): Promise<boolean> {
+  async changePassword(userId: string, dto: ChangePasswordDTO): Promise<boolean> {
     const user = await this.usersRepository.findById(userId);
 
     if (!user) {
@@ -78,7 +78,11 @@ export class UsersService {
    * Convert User to PublicUser (remove sensitive data)
    */
   private toPublicUser(user: User): PublicUser {
-    const { passwordHash, ...publicUser } = user;
-    return publicUser;
+    const { passwordHash, ...rest } = user;
+    return {
+      ...rest,
+      createdAt: rest.createdAt.toISOString(),
+      updatedAt: rest.updatedAt.toISOString(),
+    };
   }
 }
