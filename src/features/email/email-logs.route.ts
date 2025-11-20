@@ -7,6 +7,7 @@ import {
 } from '@vertical-vibing/shared-types';
 import { logger } from '../../shared/utils/logger.js';
 import { authenticate } from '../../shared/middleware/authenticate.js';
+import { emailPermissions } from './email-permission.middleware.js';
 import { db } from '../../shared/db/index.js';
 import { emailLogs } from '../../shared/db/schema/email.schema.js';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
@@ -26,16 +27,12 @@ export function createEmailLogsRouter(): Router {
   const router = Router();
   const emailService = new EmailService();
 
-  // Apply authentication to all routes
-  router.use(authenticate);
-
   /**
    * GET /api/email/logs
    * List all email logs with filtering and pagination
    */
-  router.get('/', async (req: Request, res: Response) => {
+  router.get('/', authenticate, emailPermissions.readLogs(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:logs:read'
 
       // Parse and validate query parameters
       const query = listEmailLogsQuerySchema.parse({
@@ -125,10 +122,8 @@ export function createEmailLogsRouter(): Router {
    * GET /api/email/logs/:id
    * Get email log by ID
    */
-  router.get('/:id', async (req: Request, res: Response) => {
+  router.get('/:id', authenticate, emailPermissions.readLogs(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:logs:read'
-
       const log = await db.query.emailLogs.findFirst({
         where: eq(emailLogs.id, req.params.id),
       });
@@ -148,10 +143,8 @@ export function createEmailLogsRouter(): Router {
    * POST /api/email/logs/:id/retry
    * Retry failed email
    */
-  router.post('/:id/retry', async (req: Request, res: Response) => {
+  router.post('/:id/retry', authenticate, emailPermissions.retryLogs(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:logs:retry'
-
       const retryData = retryFailedEmailDTOSchema.parse({
         emailLogId: req.params.id,
         ...req.body,
@@ -185,10 +178,8 @@ export function createEmailLogsRouter(): Router {
    * GET /api/email/stats
    * Get email statistics
    */
-  router.get('/stats', async (req: Request, res: Response) => {
+  router.get('/stats', authenticate, emailPermissions.readLogs(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:logs:read'
-
       // Parse and validate query parameters
       const query = emailStatisticsQuerySchema.parse({
         startDate: new Date(req.query.startDate as string),
@@ -226,11 +217,8 @@ export function createEmailLogsRouter(): Router {
    * DELETE /api/email/logs/:id
    * Delete email log (admin only)
    */
-  router.delete('/:id', async (req: Request, res: Response) => {
+  router.delete('/:id', authenticate, emailPermissions.deleteLogs(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:logs:delete'
-      // TODO: Check if user is super admin
-
       await db.delete(emailLogs).where(eq(emailLogs.id, req.params.id));
 
       logger.info({ emailLogId: req.params.id }, 'Deleted email log');

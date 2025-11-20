@@ -7,6 +7,8 @@ import {
 } from '@vertical-vibing/shared-types';
 import { logger } from '../../shared/utils/logger.js';
 import { authenticate } from '../../shared/middleware/authenticate.js';
+import { emailPermissions } from './email-permission.middleware.js';
+import { requireSuperadmin } from '../../shared/middleware/authorize.js';
 import { db } from '../../shared/db/index.js';
 import { systemConfig } from '../../shared/db/schema/email.schema.js';
 import { eq, like, and } from 'drizzle-orm';
@@ -27,16 +29,12 @@ export function createEmailConfigRouter(): Router {
   const router = Router();
   const configService = new ConfigService();
 
-  // Apply authentication to all routes
-  router.use(authenticate);
-
   /**
    * GET /api/email/config
    * List all configuration with effective values
    */
-  router.get('/', async (req: Request, res: Response) => {
+  router.get('/', authenticate, emailPermissions.readConfig(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:config:read'
 
       // Parse and validate query parameters
       const query = listSystemConfigsQuerySchema.parse({
@@ -119,9 +117,8 @@ export function createEmailConfigRouter(): Router {
    * GET /api/email/config/:key
    * Get specific configuration value
    */
-  router.get('/:key', async (req: Request, res: Response) => {
+  router.get('/:key', authenticate, emailPermissions.readConfig(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:config:read'
 
       const key = req.params.key;
       const value = await configService.get(key);
@@ -160,9 +157,8 @@ export function createEmailConfigRouter(): Router {
    * POST /api/email/config
    * Create new configuration
    */
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', authenticate, emailPermissions.writeConfig(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:config:write'
 
       const configData = createSystemConfigDTOSchema.parse(req.body);
 
@@ -199,9 +195,8 @@ export function createEmailConfigRouter(): Router {
    * PUT /api/email/config/:key
    * Update configuration
    */
-  router.put('/:key', async (req: Request, res: Response) => {
+  router.put('/:key', authenticate, emailPermissions.writeConfig(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:config:write'
 
       const updateData = updateSystemConfigDTOSchema.parse(req.body);
 
@@ -233,9 +228,8 @@ export function createEmailConfigRouter(): Router {
    * DELETE /api/email/config/:key
    * Delete configuration (remove from database, fall back to env/default)
    */
-  router.delete('/:key', async (req: Request, res: Response) => {
+  router.delete('/:key', authenticate, emailPermissions.deleteConfig(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:config:delete'
 
       await configService.delete(req.params.key);
 
@@ -252,10 +246,8 @@ export function createEmailConfigRouter(): Router {
    * POST /api/email/config/initialize
    * Initialize default configuration in database
    */
-  router.post('/initialize', async (req: Request, res: Response) => {
+  router.post('/initialize', authenticate, requireSuperadmin(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:config:write'
-      // TODO: Check if user is super admin
 
       await configService.initializeDefaults();
 
@@ -272,9 +264,8 @@ export function createEmailConfigRouter(): Router {
    * GET /api/email/config/categories
    * Get all configuration categories
    */
-  router.get('/meta/categories', async (req: Request, res: Response) => {
+  router.get('/meta/categories', authenticate, emailPermissions.readConfig(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:config:read'
 
       const categories = ['email', 'billing', 'general', 'feature-flags', 'integrations'];
 

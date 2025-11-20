@@ -3,6 +3,7 @@ import { EmailService } from './email.service.js';
 import { sendEmailDTOSchema, bulkSendEmailDTOSchema } from '@vertical-vibing/shared-types';
 import { logger } from '../../shared/utils/logger.js';
 import { authenticate } from '../../shared/middleware/authenticate.js';
+import { emailPermissions } from './email-permission.middleware.js';
 import { createEmailTemplatesRouter } from './email-templates.route.js';
 import { createEmailLogsRouter } from './email-logs.route.js';
 import { createEmailConfigRouter } from './email-config.route.js';
@@ -24,10 +25,8 @@ export function createEmailRouter(): Router {
    * POST /api/email/send
    * Send a single email
    */
-  router.post('/send', authenticate, async (req: Request, res: Response) => {
+  router.post('/send', authenticate, emailPermissions.send(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:send'
-
       const emailData = sendEmailDTOSchema.parse(req.body);
 
       const emailLogId = await emailService.sendEmail(emailData);
@@ -75,10 +74,8 @@ export function createEmailRouter(): Router {
    * POST /api/email/send/bulk
    * Send multiple emails in bulk
    */
-  router.post('/send/bulk', authenticate, async (req: Request, res: Response) => {
+  router.post('/send/bulk', authenticate, emailPermissions.sendBulk(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:send:bulk'
-
       const bulkData = bulkSendEmailDTOSchema.parse(req.body);
 
       const results = await Promise.allSettled(

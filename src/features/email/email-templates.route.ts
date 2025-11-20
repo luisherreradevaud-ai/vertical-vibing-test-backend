@@ -12,6 +12,7 @@ import {
 } from '@vertical-vibing/shared-types';
 import { logger } from '../../shared/utils/logger.js';
 import { authenticate } from '../../shared/middleware/authenticate.js';
+import { emailPermissions } from './email-permission.middleware.js';
 
 /**
  * Email Templates Router
@@ -32,16 +33,12 @@ export function createEmailTemplatesRouter(): Router {
   const router = Router();
   const templateService = new TemplateService();
 
-  // Apply authentication to all routes
-  router.use(authenticate);
-
   /**
    * GET /api/email/templates
    * List all templates with filtering and pagination
    */
-  router.get('/', async (req: Request, res: Response) => {
+  router.get('/', authenticate, emailPermissions.readTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:read'
 
       // Parse and validate query parameters
       const query = listEmailTemplatesQuerySchema.parse({
@@ -76,9 +73,8 @@ export function createEmailTemplatesRouter(): Router {
    * GET /api/email/templates/:id
    * Get template by ID
    */
-  router.get('/:id', async (req: Request, res: Response) => {
+  router.get('/:id', authenticate, emailPermissions.readTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:read'
 
       const template = await templateService.getTemplate(req.params.id);
 
@@ -97,9 +93,8 @@ export function createEmailTemplatesRouter(): Router {
    * POST /api/email/templates
    * Create new custom template
    */
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', authenticate, emailPermissions.writeTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:write'
 
       const templateData = createEmailTemplateDTOSchema.parse(req.body);
 
@@ -129,9 +124,8 @@ export function createEmailTemplatesRouter(): Router {
    * PUT /api/email/templates/:id
    * Update template
    */
-  router.put('/:id', async (req: Request, res: Response) => {
+  router.put('/:id', authenticate, emailPermissions.writeTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:write'
 
       const updateData = updateEmailTemplateDTOSchema.parse(req.body);
 
@@ -175,10 +169,8 @@ export function createEmailTemplatesRouter(): Router {
    * POST /api/email/templates/:id/publish
    * Publish template (make it active)
    */
-  router.post('/:id/publish', async (req: Request, res: Response) => {
-    try {
-      // TODO: Check IAM permission: 'email:templates:publish'
-
+  router.post('/:id/publish', authenticate, emailPermissions.publishTemplates(), async (req: Request, res: Response) => {
+    try{
       publishEmailTemplateDTOSchema.parse({ templateId: req.params.id });
 
       // TODO: Implement publish logic in TemplateService
@@ -194,10 +186,8 @@ export function createEmailTemplatesRouter(): Router {
    * POST /api/email/templates/:id/archive
    * Archive template (soft delete)
    */
-  router.post('/:id/archive', async (req: Request, res: Response) => {
+  router.post('/:id/archive', authenticate, emailPermissions.deleteTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:delete'
-
       archiveEmailTemplateDTOSchema.parse({ templateId: req.params.id });
 
       // TODO: Implement archive logic in TemplateService
@@ -212,10 +202,8 @@ export function createEmailTemplatesRouter(): Router {
    * POST /api/email/templates/:id/clone
    * Clone template to create a new one
    */
-  router.post('/:id/clone', async (req: Request, res: Response) => {
+  router.post('/:id/clone', authenticate, emailPermissions.writeTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:write'
-
       const cloneData = cloneEmailTemplateDTOSchema.parse({
         templateId: req.params.id,
         ...req.body,
@@ -233,9 +221,8 @@ export function createEmailTemplatesRouter(): Router {
    * GET /api/email/templates/:id/versions
    * Get all versions of a template
    */
-  router.get('/:id/versions', async (req: Request, res: Response) => {
+  router.get('/:id/versions', authenticate, emailPermissions.readTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:read'
 
       const versions = await templateService.getTemplateVersions(req.params.id);
 
@@ -254,10 +241,8 @@ export function createEmailTemplatesRouter(): Router {
    * POST /api/email/templates/:id/rollback
    * Rollback template to previous version
    */
-  router.post('/:id/rollback', async (req: Request, res: Response) => {
+  router.post('/:id/rollback', authenticate, emailPermissions.writeTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:write'
-
       const rollbackData = rollbackTemplateDTOSchema.parse({
         templateId: req.params.id,
         ...req.body,
@@ -288,10 +273,8 @@ export function createEmailTemplatesRouter(): Router {
    * POST /api/email/templates/preview
    * Preview template with sample data
    */
-  router.post('/preview', async (req: Request, res: Response) => {
+  router.post('/preview', authenticate, emailPermissions.readTemplates(), async (req: Request, res: Response) => {
     try {
-      // TODO: Check IAM permission: 'email:templates:read'
-
       const previewData = previewTemplateDTOSchema.parse(req.body);
 
       let templateName: string;
