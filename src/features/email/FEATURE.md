@@ -298,27 +298,99 @@ Admin can create custom templates via API:
 - `@aws-sdk/client-sqs` - AWS SQS integration
 - `@types/aws-lambda` - Lambda types (dev)
 
+## IAM Integration (Phase 9)
+
+The email system is fully integrated with the IAM (Identity and Access Management) system for permission-based authorization.
+
+### IAM Features
+
+Four email features registered in IAM database:
+- **feature_email_send** - Email Sending (Send, SendBulk actions)
+- **feature_email_templates** - Email Templates (Create, Read, Update, Delete, Publish, Archive, Clone)
+- **feature_email_logs** - Email Logs (Read, Retry, Delete actions)
+- **feature_email_config** - Email Configuration (Read, Update, Delete actions)
+
+### Permission Resolution
+
+Email endpoints use `PermissionsService.canPerformAction()` for authorization:
+
+```typescript
+// Permission check via IAM
+const hasPermission = await permissionsService.canPerformAction(
+  userId,
+  'feature_email_send',  // Feature key
+  'Send',                 // Action
+  companyId              // Tenant context
+);
+```
+
+### Seeding Email Features
+
+Initialize email features in IAM database:
+
+```typescript
+import { seedEmailFeatures } from './features/email/seed-email-features';
+
+// Seed features (idempotent)
+await seedEmailFeatures();
+```
+
+Or via command line:
+```bash
+npx tsx src/features/email/seed-email-features.ts seed
+```
+
+### Permission Mapping
+
+Old permission format automatically maps to IAM features:
+
+| Old Permission | IAM Feature | Action |
+|---------------|-------------|---------|
+| `email:send` | `feature_email_send` | Send |
+| `email:send:bulk` | `feature_email_send` | SendBulk |
+| `email:templates:read` | `feature_email_templates` | Read |
+| `email:templates:write` | `feature_email_templates` | Create |
+| `email:templates:publish` | `feature_email_templates` | Publish |
+| `email:logs:read` | `feature_email_logs` | Read |
+| `email:logs:retry` | `feature_email_logs` | Retry |
+| `email:config:read` | `feature_email_config` | Read |
+| `email:config:write` | `feature_email_config` | Update |
+
+### Authorization Flow
+
+1. User makes request to email endpoint
+2. `authenticate` middleware validates JWT
+3. `emailPermissions.*()` middleware checks IAM permission
+4. Permission is mapped to IAM feature + action
+5. `PermissionsService` resolves effective permission based on user levels
+6. Request proceeds if authorized, otherwise 403 Forbidden
+
+### Super Admin Bypass
+
+Super admins automatically bypass all email permission checks for full system access.
+
 ## Next Steps
 
 - [ ] **Phase 6**: Admin UI (template editor, dashboard, log viewer)
 - [ ] **Phase 7**: Developer tools (preview server, template generator CLI)
-- [ ] **Phase 8**: Infrastructure (Terraform modules for SES + SQS)
-- [ ] **Phase 9**: Integration (seamless auth + IAM integration)
 - [ ] **Phase 10**: Testing (unit + integration tests)
 - [ ] **Phase 11**: Documentation (EMAIL-SYSTEM.md guide)
 
 ## Status
 
-**Phase 5 Complete** - Admin API fully functional
+**Phase 9 Complete** - Full IAM Integration
 
 - ✅ Database schema
 - ✅ Shared types
 - ✅ Backend core services
 - ✅ Queue system with 3 worker patterns
 - ✅ Admin API endpoints
-- ⏳ IAM permission integration (placeholders ready)
+- ✅ Infrastructure (Terraform modules for SES + SQS + Lambda)
+- ✅ Compliance system (bounce/complaint handling, unsubscribe management)
+- ✅ IAM permission integration (fully integrated with PermissionsService)
 - ⏳ Admin UI (Phase 6)
 - ⏳ Developer tools (Phase 7)
-- ⏳ Infrastructure (Phase 8)
+- ⏳ Testing (Phase 10)
+- ⏳ Documentation (Phase 11)
 
-Total: ~5,000 lines of production-ready TypeScript
+Total: ~7,500 lines of production-ready TypeScript

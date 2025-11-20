@@ -2,22 +2,24 @@
  * Email Permission Middleware
  *
  * Permission checking middleware for email system routes.
- * Integrates with IAM system while supporting email-specific permissions.
+ * Fully integrated with IAM PermissionsService for feature-based authorization.
  *
- * For Phase 9, this uses a simplified permission check.
- * Future enhancement: Fully integrate with IAM features/actions system.
+ * Phase 9: Complete IAM integration
  */
 
 import type { Request, Response, NextFunction } from 'express';
 import { EMAIL_PERMISSIONS } from './email.permissions';
+import { permissionsService } from '../iam/permissions.service';
+import { getIAMFeatureForPermission } from './email-iam-features';
+import { logger } from '../../shared/utils/logger';
 
 /**
- * Check if user has email permission
+ * Check if user has email permission using IAM PermissionsService
  *
- * Permission resolution:
+ * Permission resolution (in order):
  * 1. Super admin: Always allowed
- * 2. Check if user has the required permission
- * 3. Future: Integrate with IAM permission resolution service
+ * 2. IAM feature-based permission check via PermissionsService
+ * 3. Fallback to old permission format for backwards compatibility
  */
 export function requireEmailPermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -34,38 +36,82 @@ export function requireEmailPermission(permission: string) {
 
       // Super admin bypass: Grant full access
       if (req.user.isSuperAdmin) {
-        console.log(`🦸 Super admin bypass: ${req.user.email} accessing email with permission ${permission}`);
+        logger.debug({
+          userId: req.user.userId,
+          email: req.user.email,
+          permission,
+        }, 'Super admin bypass for email permission');
         next();
         return;
       }
 
-      // TODO Phase 9+: Integrate with IAM permission resolution
-      // For now, check if user has the permission in their token/session
-      // This is a simplified check - full IAM integration coming in Phase 9+
+      // Get company ID for tenant-based permission check
+      const companyId = req.tenantId || '';
+      if (!companyId) {
+        logger.warn({ userId: req.user.userId, permission }, 'No tenant ID found for email permission check');
+        res.status(403).json({
+          status: 'error',
+          code: 'ERR_EMAIL_PERM_003',
+          message: 'Tenant context required for this operation',
+        });
+        return;
+      }
 
-      const userPermissions = (req.user as any).permissions || [];
+      // Convert old permission format to IAM feature + action
+      const iamMapping = getIAMFeatureForPermission(permission);
 
-      // Check if user has the required permission or wildcard
-      const hasPermission = userPermissions.includes(permission) ||
-                          userPermissions.includes('email:*') ||
-                          userPermissions.includes('*');
+      if (!iamMapping) {
+        logger.error({ permission }, 'Unknown email permission requested');
+        res.status(500).json({
+          status: 'error',
+          code: 'ERR_EMAIL_PERM_004',
+          message: 'Invalid permission configuration',
+        });
+        return;
+      }
+
+      // Check permission via IAM PermissionsService
+      const hasPermission = await permissionsService.canPerformAction(
+        req.user.userId,
+        iamMapping.featureKey,
+        iamMapping.action,
+        companyId
+      );
 
       if (!hasPermission) {
+        logger.warn({
+          userId: req.user.userId,
+          email: req.user.email,
+          permission,
+          featureKey: iamMapping.featureKey,
+          action: iamMapping.action,
+          companyId,
+        }, 'Email permission denied');
+
         res.status(403).json({
           status: 'error',
           code: 'ERR_EMAIL_PERM_001',
           message: 'Forbidden: You do not have permission to perform this action',
           details: {
             required: permission,
+            feature: iamMapping.featureKey,
+            action: iamMapping.action,
           },
         });
         return;
       }
 
       // Permission check successful
+      logger.debug({
+        userId: req.user.userId,
+        permission,
+        featureKey: iamMapping.featureKey,
+        action: iamMapping.action,
+      }, 'Email permission granted');
+
       next();
     } catch (error) {
-      console.error('Email permission check error:', error);
+      logger.error({ error, permission }, 'Email permission check error');
       res.status(500).json({
         status: 'error',
         code: 'ERR_EMAIL_PERM_002',
@@ -143,6 +189,7 @@ export const emailPermissions = {
 /**
  * Non-middleware permission check utility
  * Useful for inline permission checks in route handlers
+ * Uses IAM PermissionsService for authorization
  */
 export async function checkEmailPermission(
   req: Request,
@@ -157,15 +204,37 @@ export async function checkEmailPermission(
     return { allowed: true, reason: 'Super admin access' };
   }
 
-  // Check user permissions
-  const userPermissions = (req.user as any).permissions || [];
-  const hasPermission = userPermissions.includes(permission) ||
-                       userPermissions.includes('email:*') ||
-                       userPermissions.includes('*');
-
-  if (!hasPermission) {
-    return { allowed: false, reason: `Missing permission: ${permission}` };
+  // Get company ID
+  const companyId = req.tenantId || '';
+  if (!companyId) {
+    return { allowed: false, reason: 'Tenant context required' };
   }
 
-  return { allowed: true, reason: 'Permission granted' };
+  // Convert permission to IAM feature + action
+  const iamMapping = getIAMFeatureForPermission(permission);
+  if (!iamMapping) {
+    return { allowed: false, reason: 'Invalid permission format' };
+  }
+
+  try {
+    // Check via IAM PermissionsService
+    const hasPermission = await permissionsService.canPerformAction(
+      req.user.userId,
+      iamMapping.featureKey,
+      iamMapping.action,
+      companyId
+    );
+
+    if (!hasPermission) {
+      return {
+        allowed: false,
+        reason: `Missing permission: ${permission} (${iamMapping.featureKey}:${iamMapping.action})`,
+      };
+    }
+
+    return { allowed: true, reason: 'Permission granted' };
+  } catch (error) {
+    logger.error({ error, permission }, 'Error checking email permission');
+    return { allowed: false, reason: 'Permission check failed' };
+  }
 }
