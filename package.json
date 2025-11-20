@@ -14,6 +14,10 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.936.0",
+    "@aws-sdk/client-sqs": "^3.936.0",
+    "@react-email/components": "^1.0.1",
+    "@react-email/render": "^2.0.0",
     "@vertical-vibing/shared-types": "file:../../shared-types",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -25,6 +29,7 @@
     "pino": "^8.16.2",
     "pino-pretty": "^10.2.3",
     "postgres": "^3.4.3",
+    "react-email": "^5.0.4",
     "zod": "^3.22.4"
   },
   "devDependencies": {
