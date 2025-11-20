@@ -40,6 +40,13 @@ export function authorize(options: AuthorizeOptions) {
         return;
       }
 
+      // Super admin bypass: Grant full access
+      if (req.user.isSuperAdmin) {
+        console.log(`🦸 Super admin bypass: ${req.user.email} accessing ${req.path}`);
+        next();
+        return;
+      }
+
       const { userId } = req.user;
       const companyId = req.tenantId || getCompanyIdFromRequest(req);
 
@@ -139,6 +146,13 @@ export function authorizeOwn(featureId: string, action: string, resourceUserIdPa
         return;
       }
 
+      // Super admin bypass: Grant full access
+      if (req.user.isSuperAdmin) {
+        console.log(`🦸 Super admin bypass: ${req.user.email} accessing own resource`);
+        next();
+        return;
+      }
+
       const { userId } = req.user;
       const resourceUserId = req.params[resourceUserIdParam];
 
@@ -213,6 +227,13 @@ export function requireModule(moduleCode: string) {
         return;
       }
 
+      // Super admin bypass: Grant access to all modules
+      if (req.user.isSuperAdmin) {
+        console.log(`🦸 Super admin bypass: ${req.user.email} accessing module ${moduleCode}`);
+        next();
+        return;
+      }
+
       const companyId = req.tenantId || getCompanyIdFromRequest(req);
 
       if (!companyId) {
@@ -268,7 +289,7 @@ export function requireModule(moduleCode: string) {
 
 /**
  * Superadmin-only middleware
- * Checks if user has a specific role/flag (to be implemented based on your needs)
+ * Checks if user has super admin privileges
  */
 export function requireSuperadmin() {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -282,12 +303,8 @@ export function requireSuperadmin() {
         return;
       }
 
-      // TODO: Implement superadmin check
-      // For now, this is a placeholder
-      // You might check a user.isSuperadmin flag or specific email domain
-      const isSuperadmin = false; // Placeholder
-
-      if (!isSuperadmin) {
+      // Check super admin flag from JWT
+      if (!req.user.isSuperAdmin) {
         res.status(403).json({
           status: 'error',
           code: 'ERR_AUTH_007',
@@ -296,6 +313,7 @@ export function requireSuperadmin() {
         return;
       }
 
+      console.log(`🦸 Super admin access granted: ${req.user.email}`);
       next();
     } catch (error) {
       console.error('Superadmin authorization error:', error);
@@ -330,6 +348,11 @@ export async function checkPermission(
 ): Promise<{ allowed: boolean; reason: string }> {
   if (!req.user) {
     return { allowed: false, reason: 'Not authenticated' };
+  }
+
+  // Super admin bypass: Always allowed
+  if (req.user.isSuperAdmin) {
+    return { allowed: true, reason: 'Super admin access' };
   }
 
   const { userId } = req.user;

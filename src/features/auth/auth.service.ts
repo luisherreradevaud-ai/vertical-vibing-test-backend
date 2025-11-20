@@ -41,11 +41,12 @@ export class AuthService {
       // Sync user to our database (provider may have already created it)
       const user = await this.syncUserToDatabase(authResult);
 
-      // Generate our JWT token (includes authProvider)
+      // Generate our JWT token (includes authProvider and super admin flag)
       const token = generateToken({
         userId: user.id,
         email: user.email,
         authProvider: user.authProvider as AuthProvider,
+        ...(user.isSuperAdmin && { isSuperAdmin: true }),
       });
 
       // Convert to public user
@@ -81,11 +82,12 @@ export class AuthService {
       // Sync user to our database (get latest data)
       const user = await this.syncUserToDatabase(authResult);
 
-      // Generate our JWT token (includes authProvider)
+      // Generate our JWT token (includes authProvider and super admin flag)
       const token = generateToken({
         userId: user.id,
         email: user.email,
         authProvider: user.authProvider as AuthProvider,
+        ...(user.isSuperAdmin && { isSuperAdmin: true }),
       });
 
       // Convert to public user
@@ -149,6 +151,7 @@ export class AuthService {
       avatarUrl: user.avatarUrl || null,
       authProvider: user.authProvider as AuthProvider,
       externalId: user.externalId || null,
+      isSuperAdmin: user.isSuperAdmin,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
     };

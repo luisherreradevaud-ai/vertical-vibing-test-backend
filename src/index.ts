@@ -13,7 +13,13 @@ import { createSubscriptionsRouter } from './features/subscriptions/subscription
 import { createCompaniesRouter } from './features/companies/companies.route';
 import { createIAMRouter } from './features/iam/iam.route';
 import { rateLimitMiddleware } from './shared/middleware/rateLimit';
+import { SuperAdminBootstrapService } from './shared/services/super-admin-bootstrap.service';
 // import { seedIAMData } from './shared/db/seed/iam.seed';
+
+// Initialize super admin on startup (dev/staging only)
+SuperAdminBootstrapService.initialize().catch((error) => {
+  console.error('Failed to initialize super admin:', error);
+});
 
 // Seed IAM data on startup (disabled - run manually if needed)
 // seedIAMData().catch((error) => {

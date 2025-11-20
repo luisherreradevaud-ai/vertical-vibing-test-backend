@@ -15,6 +15,7 @@ export const users = pgTable('users', {
   authProvider: varchar('auth_provider', { length: 20 }).notNull().default('inhouse'), // 'inhouse' | 'cognito' | 'clerk'
   externalId: varchar('external_id', { length: 255 }), // Provider's user ID (null for in-house)
   externalMetadata: jsonb('external_metadata'), // Provider-specific data
+  isSuperAdmin: boolean('is_super_admin').notNull().default(false), // Super admin with full access (dev/staging only)
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
