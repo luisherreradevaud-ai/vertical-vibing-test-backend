@@ -8,12 +8,25 @@ import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import * as iamSchema from './schema/iam.schema';
+import * as emailSchema from './schema/email.schema';
+import * as usersSchema from './schema/users.schema';
+import * as companiesSchema from './schema/companies.schema';
+import * as subscriptionsSchema from './schema/subscriptions.schema';
+
+// Combine all schemas
+const schema = {
+  ...iamSchema,
+  ...emailSchema,
+  ...usersSchema,
+  ...companiesSchema,
+  ...subscriptionsSchema,
+};
 
 /**
  * PostgreSQL client connection
  */
 let pgClient: postgres.Sql | null = null;
-let drizzleDb: PostgresJsDatabase<typeof iamSchema> | null = null;
+let drizzleDb: PostgresJsDatabase<typeof schema> | null = null;
 
 /**
  * Get or create PostgreSQL connection
@@ -38,7 +51,7 @@ export function getPostgresClient() {
     });
 
     drizzleDb = drizzle(pgClient, {
-      schema: iamSchema,
+      schema,
       logger: process.env.NODE_ENV === 'development',
     });
 

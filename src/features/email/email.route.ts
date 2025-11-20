@@ -7,6 +7,8 @@ import { emailPermissions } from './email-permission.middleware.js';
 import { createEmailTemplatesRouter } from './email-templates.route.js';
 import { createEmailLogsRouter } from './email-logs.route.js';
 import { createEmailConfigRouter } from './email-config.route.js';
+import { createEmailWebhooksRouter } from './email-webhooks.route.js';
+import { createEmailUnsubscribeRouter } from './email-unsubscribe.route.js';
 
 /**
  * Main Email Router
@@ -16,6 +18,8 @@ import { createEmailConfigRouter } from './email-config.route.js';
  * - /api/email/templates - Template management
  * - /api/email/logs - Email log management
  * - /api/email/config - Configuration management
+ * - /api/email/webhooks - SES bounce/complaint webhooks (public)
+ * - /api/email/unsubscribe - Unsubscribe pages and API (public)
  */
 export function createEmailRouter(): Router {
   const router = Router();
@@ -52,8 +56,14 @@ export function createEmailRouter(): Router {
         if (error.message.includes('disabled')) {
           return res.status(503).json({ error: 'Email system is currently disabled' });
         }
-        if (error.message.includes('bounce list')) {
-          return res.status(400).json({ error: 'Recipient is on the bounce list' });
+        if (error.message.includes('bounce list') || error.message.includes('suppressed')) {
+          return res.status(400).json({ error: 'Recipient email address is suppressed (bounced or complained)' });
+        }
+        if (error.message.includes('unsubscribed')) {
+          return res.status(400).json({ error: 'Recipient has unsubscribed from this category of emails' });
+        }
+        if (error.message.includes('Cannot send email')) {
+          return res.status(400).json({ error: error.message });
         }
         if (error.message.includes('rate limit')) {
           return res.status(429).json({ error: 'Rate limit exceeded' });
@@ -139,10 +149,14 @@ export function createEmailRouter(): Router {
     }
   });
 
-  // Mount sub-routers
+  // Mount sub-routers (authenticated)
   router.use('/templates', createEmailTemplatesRouter());
   router.use('/logs', createEmailLogsRouter());
   router.use('/config', createEmailConfigRouter());
+
+  // Mount public sub-routers (no authentication)
+  router.use('/webhooks', createEmailWebhooksRouter());
+  router.use('/unsubscribe', createEmailUnsubscribeRouter());
 
   return router;
 }

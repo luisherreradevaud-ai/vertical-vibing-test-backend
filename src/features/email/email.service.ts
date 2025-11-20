@@ -7,6 +7,8 @@ import { emailLogs, emailBounces } from '../../shared/db/schema/email.schema.js'
 import { logger } from '../../shared/utils/logger.js';
 import { TemplateService } from './template.service.js';
 import { ConfigService } from './config.service.js';
+import { ComplianceService } from './compliance.service.js';
+import { generateUnsubscribeToken } from './email-unsubscribe.route.js';
 
 /**
  * Email Service
@@ -23,15 +25,18 @@ import { ConfigService } from './config.service.js';
 export class EmailService {
   private templateService: TemplateService;
   private configService: ConfigService;
+  private complianceService: ComplianceService;
   private sesClient: SESClient | null = null;
   private sqsClient: SQSClient | null = null;
 
   constructor(
     templateService?: TemplateService,
     configService?: ConfigService,
+    complianceService?: ComplianceService,
   ) {
     this.templateService = templateService ?? new TemplateService();
     this.configService = configService ?? new ConfigService();
+    this.complianceService = complianceService ?? new ComplianceService();
   }
 
   /**
@@ -68,10 +73,18 @@ export class EmailService {
         throw new Error('Email system is disabled');
       }
 
-      // Check if recipient is bounced
-      const isBounced = await this.isEmailBounced(emailData.toAddress);
-      if (isBounced) {
-        throw new Error(`Email address ${emailData.toAddress} is on the bounce list`);
+      // Check compliance (suppressions and unsubscribes)
+      const canSend = await this.complianceService.canSendEmail(
+        emailData.toAddress,
+        emailData.templateData?.category as string | undefined
+      );
+
+      if (!canSend.canSend) {
+        logger.warn(
+          { email: emailData.toAddress, reason: canSend.reason },
+          'Email blocked by compliance check'
+        );
+        throw new Error(`Cannot send email: ${canSend.reason}`);
       }
 
       // Check rate limits
@@ -122,6 +135,15 @@ export class EmailService {
         .returning();
 
       try {
+        // Generate unsubscribe token and URLs
+        const unsubscribeToken = generateUnsubscribeToken(
+          emailData.toAddress,
+          emailData.templateData?.category as string | undefined
+        );
+        const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+        const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe/${unsubscribeToken}`;
+        const listUnsubscribeUrl = `${baseUrl}/api/email/unsubscribe/list-unsubscribe/${unsubscribeToken}`;
+
         // Send via SES
         const command = new SendEmailCommand({
           Source: `${emailConfig.fromName} <${emailConfig.fromAddress}>`,
@@ -149,6 +171,17 @@ export class EmailService {
             },
           },
           ReplyToAddresses: emailConfig.replyTo ? [emailConfig.replyTo] : undefined,
+          // Compliance headers (RFC 8058)
+          Tags: [
+            {
+              Name: 'List-Unsubscribe',
+              Value: `<${unsubscribeUrl}>`,
+            },
+            {
+              Name: 'List-Unsubscribe-Post',
+              Value: 'List-Unsubscribe=One-Click',
+            },
+          ],
         });
 
         const response = await this.sesClient!.send(command);

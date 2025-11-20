@@ -148,10 +148,12 @@ export const emailLogs = pgTable('email_logs', {
 });
 
 /**
- * Email Bounces table schema
+ * Email Bounces table schema (DEPRECATED - use emailSuppressions)
  *
  * Tracks email addresses that have bounced or complained
  * Prevents sending to problematic addresses
+ *
+ * @deprecated Use emailSuppressions table for new implementations
  */
 export const emailBounces = pgTable('email_bounces', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -162,6 +164,115 @@ export const emailBounces = pgTable('email_bounces', {
 
   // Metadata from SES
   sesNotification: jsonb('ses_notification'), // Full SNS notification from SES
+});
+
+/**
+ * Email Suppressions table schema
+ *
+ * Comprehensive suppression list for email addresses that should not receive emails
+ * Includes bounces, complaints, and unsubscribes with proper compliance tracking
+ */
+export const emailSuppressions = pgTable('email_suppressions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Email address being suppressed
+  emailAddress: varchar('email_address', { length: 255 }).notNull().unique(),
+
+  // Suppression reason
+  reason: varchar('reason', { length: 50 }).notNull(), // 'bounce_hard', 'bounce_soft', 'complaint', 'unsubscribe', 'manual'
+  reasonDetails: text('reason_details'), // Additional details about the suppression
+
+  // Bounce-specific fields
+  bounceType: varchar('bounce_type', { length: 50 }), // 'Permanent', 'Transient', 'Undetermined'
+  bounceSubType: varchar('bounce_sub_type', { length: 50 }), // 'General', 'NoEmail', 'Suppressed', 'MailboxFull', etc.
+
+  // Complaint-specific fields
+  complaintFeedbackType: varchar('complaint_feedback_type', { length: 50 }), // 'abuse', 'fraud', 'virus', etc.
+
+  // Source tracking
+  sourceType: varchar('source_type', { length: 50 }).notNull().default('ses'), // 'ses', 'user_request', 'admin', 'api'
+  sourceMessageId: varchar('source_message_id', { length: 255 }), // SES message ID that triggered this
+
+  // Status
+  isActive: boolean('is_active').notNull().default(true), // Can be manually reactivated
+
+  // Counts for soft bounces (auto-suppress after threshold)
+  bounceCount: integer('bounce_count').notNull().default(1),
+  lastBounceAt: timestamp('last_bounce_at'),
+
+  // SES notification data
+  sesNotification: jsonb('ses_notification'), // Full SNS notification from SES
+
+  // Metadata
+  userAgent: varchar('user_agent', { length: 500 }), // For unsubscribe requests
+  ipAddress: varchar('ip_address', { length: 45 }), // For unsubscribe requests
+
+  // Timestamps
+  suppressedAt: timestamp('suppressed_at').defaultNow().notNull(),
+  reactivatedAt: timestamp('reactivated_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
+ * Email Unsubscribe Preferences table schema
+ *
+ * Granular unsubscribe preferences per email category
+ * Allows users to opt-out of specific email types while receiving others
+ */
+export const emailUnsubscribePreferences = pgTable('email_unsubscribe_preferences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Email address
+  emailAddress: varchar('email_address', { length: 255 }).notNull(),
+
+  // Category-specific unsubscribe
+  category: varchar('category', { length: 50 }).notNull(), // 'marketing', 'notifications', 'billing', 'auth', 'all'
+  isUnsubscribed: boolean('is_unsubscribed').notNull().default(true),
+
+  // Unsubscribe source
+  sourceType: varchar('source_type', { length: 50 }).notNull(), // 'email_link', 'preference_center', 'admin', 'api'
+  unsubscribeToken: varchar('unsubscribe_token', { length: 255 }), // Token from email link (for audit)
+
+  // Tracking
+  userAgent: varchar('user_agent', { length: 500 }),
+  ipAddress: varchar('ip_address', { length: 45 }),
+
+  // Timestamps
+  unsubscribedAt: timestamp('unsubscribed_at').defaultNow().notNull(),
+  resubscribedAt: timestamp('resubscribed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
+ * Email Compliance Events table schema
+ *
+ * Audit log of all compliance-related events for regulatory compliance
+ * Tracks bounces, complaints, unsubscribes, and list-unsubscribe header clicks
+ */
+export const emailComplianceEvents = pgTable('email_compliance_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Event type
+  eventType: varchar('event_type', { length: 50 }).notNull(), // 'bounce', 'complaint', 'unsubscribe', 'list_unsubscribe', 'resubscribe'
+
+  // Email and message tracking
+  emailAddress: varchar('email_address', { length: 255 }).notNull(),
+  emailLogId: uuid('email_log_id').references(() => emailLogs.id), // Link to original email
+  messageId: varchar('message_id', { length: 255 }), // SES message ID
+
+  // Event details
+  eventData: jsonb('event_data').notNull(), // Full event payload (SES notification, form data, etc.)
+
+  // Processing status
+  processed: boolean('processed').notNull().default(false), // Whether this event has been acted upon
+  processedAt: timestamp('processed_at'),
+
+  // Timestamps
+  occurredAt: timestamp('occurred_at').notNull(), // When the event actually happened
+  receivedAt: timestamp('received_at').defaultNow().notNull(), // When we received the notification
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 /**
@@ -206,3 +317,12 @@ export type NewEmailLog = typeof emailLogs.$inferInsert;
 
 export type EmailBounce = typeof emailBounces.$inferSelect;
 export type NewEmailBounce = typeof emailBounces.$inferInsert;
+
+export type EmailSuppression = typeof emailSuppressions.$inferSelect;
+export type NewEmailSuppression = typeof emailSuppressions.$inferInsert;
+
+export type EmailUnsubscribePreference = typeof emailUnsubscribePreferences.$inferSelect;
+export type NewEmailUnsubscribePreference = typeof emailUnsubscribePreferences.$inferInsert;
+
+export type EmailComplianceEvent = typeof emailComplianceEvents.$inferSelect;
+export type NewEmailComplianceEvent = typeof emailComplianceEvents.$inferInsert;
