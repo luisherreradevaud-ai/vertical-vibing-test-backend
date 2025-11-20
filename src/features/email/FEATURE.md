@@ -369,16 +369,89 @@ Old permission format automatically maps to IAM features:
 
 Super admins automatically bypass all email permission checks for full system access.
 
+## Admin UI (Phase 6)
+
+The email system includes a complete Next.js-based Admin UI for managing all email operations.
+
+### UI Components
+
+#### Email Dashboard (`/email`)
+- Statistics overview (sent, failed, queued, bounced, success rate)
+- Recent email activity table
+- Quick action links to all management pages
+- Protected by `feature_email_logs:Read` permission
+
+#### Templates Manager (`/email/templates`)
+- Full CRUD for email templates
+- Filter by status, category, and type
+- Version control with rollback capability
+- Clone, publish, archive, and preview actions
+- Template editor with variables support
+- Protected by `feature_email_templates:Read` permission
+
+#### Email Logs Viewer (`/email/logs`)
+- Browse all email delivery history
+- Filter by status, template, recipient
+- Retry failed emails
+- View detailed log information
+- Delete logs (admin only)
+- Pagination and sorting
+- Protected by `feature_email_logs:Read` permission
+
+#### Settings Manager (`/email/settings`)
+- Manage email system configuration
+- 3-tier configuration precedence (DB > Env > Default)
+- Show effective values and sources
+- Create, update, and delete configurations
+- Category-based organization
+- Protected by `feature_email_config:Read` permission
+
+### Frontend Structure
+
+```
+frontend/src/features/email/
+├── index.ts                      # Public exports
+├── api/
+│   └── emailApi.ts               # API client (~650 lines)
+├── ui/
+│   ├── EmailDashboard.tsx        # Dashboard (~345 lines)
+│   ├── EmailTemplatesManager.tsx # Templates UI (~757 lines)
+│   ├── EmailLogsViewer.tsx       # Logs UI (~490 lines)
+│   └── EmailSettingsManager.tsx  # Settings UI (~665 lines)
+└── store/                        # Zustand stores (if needed)
+```
+
+### Page Routes
+
+```
+app/email/
+├── page.tsx                      # Dashboard page
+├── templates/page.tsx            # Templates page
+├── logs/page.tsx                 # Logs page
+└── settings/page.tsx             # Settings page
+```
+
+All pages use the `<Gate>` component for IAM-based permission checks with appropriate fallback UI.
+
+### Features
+
+✅ **Complete Admin UI** - Full-featured management interface
+✅ **IAM Integration** - Permission-based access control on all pages
+✅ **Responsive Design** - Tailwind CSS with mobile support
+✅ **Real-time Updates** - Auto-refresh and loading states
+✅ **Error Handling** - Comprehensive error messages and retry logic
+✅ **Type Safety** - Full TypeScript with shared types
+✅ **User Experience** - Modals, filters, pagination, and search
+
 ## Next Steps
 
-- [ ] **Phase 6**: Admin UI (template editor, dashboard, log viewer)
 - [ ] **Phase 7**: Developer tools (preview server, template generator CLI)
 - [ ] **Phase 10**: Testing (unit + integration tests)
 - [ ] **Phase 11**: Documentation (EMAIL-SYSTEM.md guide)
 
 ## Status
 
-**Phase 9 Complete** - Full IAM Integration
+**Phase 6 Complete** - Admin UI (Frontend)
 
 - ✅ Database schema
 - ✅ Shared types
@@ -388,9 +461,9 @@ Super admins automatically bypass all email permission checks for full system ac
 - ✅ Infrastructure (Terraform modules for SES + SQS + Lambda)
 - ✅ Compliance system (bounce/complaint handling, unsubscribe management)
 - ✅ IAM permission integration (fully integrated with PermissionsService)
-- ⏳ Admin UI (Phase 6)
+- ✅ **Admin UI (Phase 6) - Complete Next.js UI with 4 management pages**
 - ⏳ Developer tools (Phase 7)
 - ⏳ Testing (Phase 10)
 - ⏳ Documentation (Phase 11)
 
-Total: ~7,500 lines of production-ready TypeScript
+Total: ~10,400 lines of production-ready TypeScript (~7,500 backend + ~2,900 frontend)
