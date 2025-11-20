@@ -52,15 +52,23 @@ export function createEmailTemplatesRouter(): Router {
         sortOrder: req.query.sortOrder,
       });
 
-      // TODO: Implement pagination and filtering in TemplateService
-      // For now, return basic response
+      // Get templates from service
+      const result = await templateService.listTemplates({
+        page: query.page,
+        limit: query.limit,
+        status: query.status as any,
+        category: query.category,
+        isSystemTemplate: query.isSystemTemplate,
+        search: query.search,
+      });
+
       res.json({
-        templates: [],
+        templates: result.templates,
         pagination: {
           page: query.page,
           limit: query.limit,
-          total: 0,
-          totalPages: 0,
+          total: result.total,
+          totalPages: Math.ceil(result.total / query.limit),
         },
       });
     } catch (error) {
@@ -173,11 +181,22 @@ export function createEmailTemplatesRouter(): Router {
     try{
       publishEmailTemplateDTOSchema.parse({ templateId: req.params.id });
 
-      // TODO: Implement publish logic in TemplateService
-      // For now, just return success
-      res.json({ success: true, message: 'Template published' });
+      const published = await templateService.publishTemplate(req.params.id, req.user?.id);
+
+      logger.info({ templateId: req.params.id }, 'Template published successfully');
+      res.json({ success: true, message: 'Template published', template: published });
     } catch (error) {
       logger.error({ error, templateId: req.params.id }, 'Error publishing template');
+
+      if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+          return res.status(404).json({ error: 'Template not found' });
+        }
+        if (error.message.includes('system template')) {
+          return res.status(403).json({ error: 'Cannot publish system templates' });
+        }
+      }
+
       res.status(500).json({ error: 'Failed to publish template' });
     }
   });
@@ -190,10 +209,22 @@ export function createEmailTemplatesRouter(): Router {
     try {
       archiveEmailTemplateDTOSchema.parse({ templateId: req.params.id });
 
-      // TODO: Implement archive logic in TemplateService
-      res.json({ success: true, message: 'Template archived' });
+      const archived = await templateService.archiveTemplate(req.params.id);
+
+      logger.info({ templateId: req.params.id }, 'Template archived successfully');
+      res.json({ success: true, message: 'Template archived', template: archived });
     } catch (error) {
       logger.error({ error, templateId: req.params.id }, 'Error archiving template');
+
+      if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+          return res.status(404).json({ error: 'Template not found' });
+        }
+        if (error.message.includes('system template')) {
+          return res.status(403).json({ error: 'Cannot archive system templates' });
+        }
+      }
+
       res.status(500).json({ error: 'Failed to archive template' });
     }
   });
@@ -209,10 +240,26 @@ export function createEmailTemplatesRouter(): Router {
         ...req.body,
       });
 
-      // TODO: Implement clone logic in TemplateService
-      res.json({ success: true, message: 'Template cloned' });
+      const cloned = await templateService.cloneTemplate(
+        cloneData.templateId,
+        cloneData.newName,
+        req.user?.id
+      );
+
+      logger.info({ sourceTemplateId: req.params.id, clonedTemplateId: cloned.id }, 'Template cloned successfully');
+      res.json({ success: true, message: 'Template cloned', template: cloned });
     } catch (error) {
       logger.error({ error, templateId: req.params.id }, 'Error cloning template');
+
+      if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+          return res.status(404).json({ error: 'Source template not found' });
+        }
+        if (error.message.includes('already exists')) {
+          return res.status(409).json({ error: 'A template with that name already exists' });
+        }
+      }
+
       res.status(500).json({ error: 'Failed to clone template' });
     }
   });

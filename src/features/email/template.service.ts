@@ -451,4 +451,226 @@ export class TemplateService {
       throw error;
     }
   }
+
+  /**
+   * List templates with pagination and filtering
+   */
+  async listTemplates(options: {
+    page?: number;
+    limit?: number;
+    status?: 'draft' | 'published' | 'archived';
+    category?: string;
+    isSystemTemplate?: boolean;
+    search?: string;
+  }): Promise<{ templates: EmailTemplate[]; total: number }> {
+    try {
+      const { page = 1, limit = 20, status, category, isSystemTemplate, search } = options;
+      const offset = (page - 1) * limit;
+
+      // Build where conditions
+      const conditions = [];
+
+      if (status) {
+        conditions.push(eq(emailTemplates.status, status));
+      }
+
+      if (category) {
+        conditions.push(eq(emailTemplates.category, category));
+      }
+
+      if (isSystemTemplate !== undefined) {
+        conditions.push(eq(emailTemplates.isSystemTemplate, isSystemTemplate));
+      }
+
+      // For search, we'd need to use sql operator for LIKE
+      // For now, we'll get all and filter in memory (not optimal for large datasets)
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get templates
+      let templates = await db.query.emailTemplates.findMany({
+        where: whereClause,
+        limit: limit + 1, // Fetch one extra to check if there are more
+        offset,
+        orderBy: (t, { desc }) => [desc(t.updatedAt)],
+      });
+
+      // Search filter (in-memory for now)
+      if (search) {
+        const searchLower = search.toLowerCase();
+        templates = templates.filter(
+          (t) =>
+            t.name.toLowerCase().includes(searchLower) ||
+            t.displayName.toLowerCase().includes(searchLower) ||
+            (t.description?.toLowerCase().includes(searchLower) ?? false)
+        );
+      }
+
+      // Get total count (simplified - in production should be a separate count query)
+      const allTemplates = await db.query.emailTemplates.findMany({
+        where: whereClause,
+      });
+
+      let total = allTemplates.length;
+      if (search) {
+        const searchLower = search.toLowerCase();
+        total = allTemplates.filter(
+          (t) =>
+            t.name.toLowerCase().includes(searchLower) ||
+            t.displayName.toLowerCase().includes(searchLower) ||
+            (t.description?.toLowerCase().includes(searchLower) ?? false)
+        ).length;
+      }
+
+      // Trim to exact limit
+      const hasMore = templates.length > limit;
+      if (hasMore) {
+        templates = templates.slice(0, limit);
+      }
+
+      return { templates, total };
+    } catch (error) {
+      logger.error({ error, options }, 'Error listing templates');
+      throw error;
+    }
+  }
+
+  /**
+   * Publish a draft template (make it active)
+   */
+  async publishTemplate(templateId: string, publishedBy?: string | null): Promise<EmailTemplate> {
+    try {
+      const template = await db.query.emailTemplates.findFirst({
+        where: eq(emailTemplates.id, templateId),
+      });
+
+      if (!template) {
+        throw new Error(`Template ${templateId} not found`);
+      }
+
+      if (template.isSystemTemplate) {
+        throw new Error('Cannot publish system templates');
+      }
+
+      if (template.status === 'published') {
+        logger.info({ templateId }, 'Template already published');
+        return template;
+      }
+
+      // Update template to published status
+      const [updated] = await db
+        .update(emailTemplates)
+        .set({
+          status: 'published',
+          publishedBy,
+          publishedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(emailTemplates.id, templateId))
+        .returning();
+
+      logger.info({ templateId, name: updated.name }, 'Template published');
+      return updated;
+    } catch (error) {
+      logger.error({ error, templateId }, 'Error publishing template');
+      throw error;
+    }
+  }
+
+  /**
+   * Archive a template (soft delete)
+   */
+  async archiveTemplate(templateId: string): Promise<EmailTemplate> {
+    try {
+      const template = await db.query.emailTemplates.findFirst({
+        where: eq(emailTemplates.id, templateId),
+      });
+
+      if (!template) {
+        throw new Error(`Template ${templateId} not found`);
+      }
+
+      if (template.isSystemTemplate) {
+        throw new Error('Cannot archive system templates');
+      }
+
+      if (template.status === 'archived') {
+        logger.info({ templateId }, 'Template already archived');
+        return template;
+      }
+
+      // Update template to archived status
+      const [updated] = await db
+        .update(emailTemplates)
+        .set({
+          status: 'archived',
+          updatedAt: new Date(),
+        })
+        .where(eq(emailTemplates.id, templateId))
+        .returning();
+
+      logger.info({ templateId, name: updated.name }, 'Template archived');
+      return updated;
+    } catch (error) {
+      logger.error({ error, templateId }, 'Error archiving template');
+      throw error;
+    }
+  }
+
+  /**
+   * Clone an existing template
+   */
+  async cloneTemplate(
+    templateId: string,
+    newName: string,
+    createdBy?: string | null
+  ): Promise<EmailTemplate> {
+    try {
+      const sourceTemplate = await db.query.emailTemplates.findFirst({
+        where: eq(emailTemplates.id, templateId),
+      });
+
+      if (!sourceTemplate) {
+        throw new Error(`Source template ${templateId} not found`);
+      }
+
+      // Check if new name already exists
+      const existingWithName = await db.query.emailTemplates.findFirst({
+        where: eq(emailTemplates.name, newName),
+      });
+
+      if (existingWithName) {
+        throw new Error(`Template with name "${newName}" already exists`);
+      }
+
+      // Create cloned template
+      const [cloned] = await db
+        .insert(emailTemplates)
+        .values({
+          name: newName,
+          displayName: `${sourceTemplate.displayName} (Copy)`,
+          description: sourceTemplate.description,
+          category: sourceTemplate.category,
+          status: 'draft', // Always create as draft
+          contentType: sourceTemplate.contentType,
+          content: sourceTemplate.content,
+          variables: sourceTemplate.variables,
+          subjectTemplate: sourceTemplate.subjectTemplate,
+          version: 1, // Start at version 1
+          isSystemTemplate: false, // Clones are never system templates
+          parentTemplateId: sourceTemplate.id, // Track the source
+          createdBy,
+          updatedBy: createdBy,
+        })
+        .returning();
+
+      logger.info(
+        { sourceTemplateId: templateId, clonedTemplateId: cloned.id, newName },
+        'Template cloned'
+      );
+      return cloned;
+    } catch (error) {
+      logger.error({ error, templateId, newName }, 'Error cloning template');
+      throw error;
+    }
+  }
 }
